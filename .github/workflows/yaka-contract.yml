@@ -1,0 +1,33 @@
+name: YaKa board contract
+
+on:
+  pull_request:
+    paths:
+      - "main/boards/chatchat/hi-yaka-v3/**"
+      - "main/CMakeLists.txt"
+      - "main/Kconfig.projbuild"
+      - "scripts/tests/test_hi_yaka_board.py"
+      - ".github/workflows/yaka-contract.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "main/boards/chatchat/hi-yaka-v3/**"
+      - "main/CMakeLists.txt"
+      - "main/Kconfig.projbuild"
+      - "scripts/tests/test_hi_yaka_board.py"
+      - ".github/workflows/yaka-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  board-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Hi YaKa board contract
+        run: python -m unittest scripts.tests.test_hi_yaka_board -v

@@ -1,3 +1,16 @@
+# Hi YaKa Firmware
+
+本仓库是 YaKa 3.0 的私有产品固件仓库，基于 `78/xiaozhi-esp32` 的固定发布基线开发。
+
+- 当前阶段：`M1 — 最小板级启动与总线安全态`
+- 上游基线：`xiaozhi-esp32 v2.5.2` / `49b4380b3faa0ceadd28a3e78aaf0f311c46c57e`
+- 目标：ESP32-C6、ESP-IDF 6.1、16 MiB 外置 Flash、无 PSRAM
+- 当前板型：`chatchat/hi-yaka-v3`
+
+M1 只覆盖构建、启动诊断、UART 日志、I2C 探测和 PCA9557 安全默认态；LCD、TF、音频、NFC 业务和产品交互尚未进入实板通过状态。详见 [M1 基线说明](docs/yaka/m1-baseline.md) 与 [板型文档](main/boards/chatchat/hi-yaka-v3/README.md)。
+
+---
+
 # An MCP-based Chatbot
 
 (English | [中文](README_zh.md) | [日本語](README_ja.md))

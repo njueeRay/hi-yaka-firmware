@@ -179,6 +179,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_BREAD_COMPACT_WIFI_CAM
         bool "Bread Compact Wi-Fi + LCD + Camera (面包板)"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_HI_YAKA_V3
+        bool "ChatChat Hi YaKa V3"
+        depends on IDF_TARGET_ESP32C6
     config BOARD_TYPE_CHD_ESP32S3_BOX
         bool "CHD ESP32-S3-BOX (虫洞)"
         depends on IDF_TARGET_ESP32S3
