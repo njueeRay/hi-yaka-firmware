@@ -6,7 +6,6 @@
         {
             "name": "hi-yaka-v3",
             "sdkconfig_append": [
-                "CONFIG_SPIRAM=n",
                 "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
                 "CONFIG_WAKE_WORD_DISABLED=y",
                 "CONFIG_USE_ESP_WAKE_WORD=n",

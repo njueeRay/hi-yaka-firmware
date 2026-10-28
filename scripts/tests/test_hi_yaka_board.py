@@ -18,7 +18,7 @@ class HiYakaBoardContractTest(unittest.TestCase):
         build = config["builds"][0]
         self.assertEqual(build["name"], "hi-yaka-v3")
         options = set(build["sdkconfig_append"])
-        self.assertIn("CONFIG_SPIRAM=n", options)
+        self.assertFalse(any(option.startswith("CONFIG_SPIRAM=") for option in options))
         self.assertIn("CONFIG_ESPTOOLPY_FLASHMODE_DIO=y", options)
         self.assertIn("CONFIG_WAKE_WORD_DISABLED=y", options)
         self.assertNotIn("CONFIG_USE_DEVICE_AEC=y", options)
@@ -56,6 +56,8 @@ class HiYakaBoardContractTest(unittest.TestCase):
 
     def test_m1_does_not_enable_unvalidated_peripherals(self):
         source = (BOARD_DIR / "hi_yaka_v3_board.cc").read_text(encoding="utf-8")
+        self.assertIn("CONFIG_IDF_TARGET_ESP32C6", source)
+        self.assertIn("defined(CONFIG_SPIRAM) && CONFIG_SPIRAM", source)
         self.assertIn("DummyAudioCodec", source)
         self.assertNotRegex(source, r"Es7210|Es8311AudioCodec|esp_lcd_new_panel|esp_vfs_fat")
 

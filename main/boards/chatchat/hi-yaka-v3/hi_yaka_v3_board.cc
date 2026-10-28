@@ -16,6 +16,10 @@
 
 #define TAG "HiYakaV3"
 
+#if !defined(CONFIG_IDF_TARGET_ESP32C6) || !CONFIG_IDF_TARGET_ESP32C6
+#error "hi-yaka-v3 is defined only for ESP32-C6"
+#endif
+
 #if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
 #error "ESP32-C6 does not support external PSRAM; hi-yaka-v3 must remain a no-PSRAM build"
 #endif
