@@ -7,7 +7,7 @@
 - 目标：ESP32-C6、ESP-IDF 6.1、16 MiB 外置 Flash、无 PSRAM
 - 当前板型：`chatchat/hi-yaka-v3`
 
-M1 只覆盖构建、启动诊断、UART 日志、I2C 探测和 PCA9557 安全默认态；LCD、TF、音频、NFC 业务和产品交互尚未进入实板通过状态。总体设计见 [固件总体架构](docs/yaka/firmware-architecture.md)，阶段边界见 [M1 基线说明](docs/yaka/m1-baseline.md)，硬件入口见 [板型文档](main/boards/chatchat/hi-yaka-v3/README.md)。
+M1 只覆盖构建、启动诊断、UART 日志、I2C 探测和 PCA9557 安全默认态；LCD、TF、音频、NFC 业务和产品交互尚未进入实板通过状态。文档总入口见 [YaKa 固件文档索引](docs/README.md)，总体设计见 [固件总体架构](docs/yaka/firmware-architecture.md)，阶段边界见 [M1 基线说明](docs/yaka/m1-baseline.md)，硬件入口见 [板型文档](main/boards/chatchat/hi-yaka-v3/README.md)。
 
 ---
 

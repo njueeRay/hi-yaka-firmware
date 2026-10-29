@@ -1,0 +1,5 @@
+d2da46dcd980060614016da17d24c9b153577c8c454f2737622a448693bbd1cb  yaka-3.0-final-schematic-pcb-reaudit-2026-10-21.md
+fe0129892773decae14c210b9e4db0402e42ffb7e46f25444fabb7fbd2378455  yaka-3.0-pcb-comprehensive-audit-and-eco-spec.md
+21827082c722903b4b8ac7c6289d42e3f838cc548a14e96d565cc6aa1ca03c90  yaka-3.0-prefreeze-release-manufacturing-and-sourcing-checklist.md
+10a8a83fbe50177ba737962a3b2a028e0196384ff88f6b26f9ace4e475a4fc46  yaka-3.0-procurement-and-consignment-list.csv
+b6fe1b2f634010054158d67e5f3538f11909c551cf893fda26aad7ff219abcc9  yaka-3.0-schematic-audit-and-eco-spec.md

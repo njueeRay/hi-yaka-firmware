@@ -1,0 +1,4 @@
+interface:
+  display_name: "YaKa 项目治理"
+  short_description: "维护 YaKa 3.0 产品、硬件、固件、验证和飞书同步文档"
+  default_prompt: "Use $yaka-project to maintain the YaKa 3.0 firmware and its governed documentation."
