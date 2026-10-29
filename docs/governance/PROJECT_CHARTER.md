@@ -16,7 +16,7 @@
 - LCD、实体键、RGB、振动和电量估算；
 - NFC 只读、IMU 基础能力；
 - 诊断、用户确认 OTA 和失败回滚；
-- GitHub 私有仓库、Raynode 可复现构建、本地与飞书文档治理。
+- GitHub 私有开发仓库、`ChatChatTech/yaka/firmware` 公开发布快照、Raynode 可复现构建、本地与飞书文档治理。
 
 ## 3. 非目标
 
@@ -32,17 +32,19 @@ Owner 冻结产品目标、根本硬件变更、不可兼容协议/格式、量�
 
 ## 6. 工作分工
 
-- GitHub `origin` 保存产品差异和治理文档；`upstream` 跟踪小智发布版本；
+- 私有 GitHub `origin` 保存完整开发历史、产品差异和治理文档；`upstream` 跟踪小智发布版本；
+- `ChatChatTech/yaka/firmware` 只保存通过公开边界审查的固件快照；
 - Raynode 固定 ESP-IDF 6.1 完成可复现构建；
 - 本地电脑负责代码审阅、飞书同步和真实硬件串口/烧录入口；
 - EasyEDA Pro 活体工程和冻结制造包负责硬件真值；
 - 飞书负责团队阅读、日志协作和附件入口，Git Markdown 负责审计和变更历史。
 
-## 7. 仓库归属状态
+## 7. 双仓库发布模型
 
-- 目标归属：`ChatChatTech/hi-yaka-firmware`，私有仓库；
-- 当前暂存：`njueeRay/hi-yaka-firmware`，私有仓库；
-- 迁移状态：2026-10-29 调用 GitHub transfer API 被组织策略拒绝，原因是当前账号无权在 ChatChatTech 创建私有仓库；
-- 解锁条件：组织 Owner 授予创建私有仓库权限，或由组织 Owner 接收/发起迁移；
-- 边界：不得覆盖或改写历史 `ChatChatTech/yaka-firmware`，该仓库只保留为历史资料。
+- 私有开发真值：`njueeRay/hi-yaka-firmware`，保留完整历史、开发分支、内部 PRD、飞书登记和硬件/制造资料；
+- 公开产品仓库：`ChatChatTech/yaka`，固件固定发布到 `/firmware`，未来应用使用其他顶层目录；
+- 公开方式：发布经过审查的树快照，不做 Git subtree、mirror 或私有历史迁移；
+- 每个公开快照记录私有来源 SHA、上游 SHA、ESP-IDF、证据等级、公开排除项和许可证；
+- 当前公开提交：`ChatChatTech/yaka@4ea1c48`，来源私有提交 `2a9fda1`；
+- 历史 `ChatChatTech/yaka-firmware` 继续只作为历史资料，不覆盖、不改写。
 

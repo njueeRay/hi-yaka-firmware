@@ -8,16 +8,16 @@
 
 | 本地事实源/治理对象 | 飞书文档 | Token | Revision | 2026-10-29 状态 |
 |---|---|---|---:|---|
-| `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 项目首页与版本索引](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 25 | 已追加当前基线并回读 |
+| `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 项目首页与版本索引](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 26 | 已追加双仓库发布策略并回读 |
 | 产品需求摘要与状态机 | [01 YaKa 3.x 产品需求与状态机](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 4 | 已追加产品边界并回读 |
 | 硬件/固件接口摘要 | [02 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 18 | 已按 R1.6 附件复核并回读 I²C 契约 |
-| 仓库、上游与技术决策 | [03 版本、决策与变更日志](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 10 | 已追加决策记录并回读 |
+| 仓库、上游与技术决策 | [03 版本、决策与变更日志](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 11 | 已记录私有开发/公开快照决策并回读 |
 | 外部资料治理 | [04 外部参考与调研库](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 4 | 已追加来源优先级并回读 |
 | `docs/governance/EVIDENCE_POLICY.md` | [05 验证、缺陷与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 4 | 已追加 L0–L3 证据规则并回读 |
 | `docs/governance/FIRMWARE_PRD.md` | [06 YaKa 3.0 固件 PRD](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 4 | 新建、附件上传、目录回读完成 |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [07 YaKa 3.0 产品数据与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 2 | 新建并完成目录回读 |
-| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [08 YaKa 3.0 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 24 | 已按项目操作台结构重构并回读，五个权威附件保留 |
-| 历史仓库与旧资料归档规则 | [99 历史归档索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 5 | 已追加新旧仓库边界并回读 |
+| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [08 YaKa 3.0 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 25 | 项目操作台结构及公开仓库日志已回读，五个权威附件保留 |
+| 历史仓库与旧资料归档规则 | [99 历史归档索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 6 | 已记录历史/私有/公开三仓库边界并回读 |
 
 最近一次主文档结构同步对应本地提交：`a0a4f3b`（2026-10-29）。
 
