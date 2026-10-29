@@ -18,7 +18,7 @@
 | `docs/governance/PROJECT_CHARTER.md` | 北极星、范围、决策权限和完成定义 |
 | `docs/governance/FIRMWARE_PRD.md` | 固件需求、里程碑、兼容合同和验收 |
 | `docs/yaka/firmware-architecture.md` | 软件分层、数据流和上游复用边界 |
-| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | 硬件主文档、接口契约、制造与研发日志入口 |
+| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | 项目操作台：阶段规划、跨域链路、材料索引与连续研发日志；详细硬件事实留在专项附件 |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | 对用户和测试人员可见的产品数据与操作 |
 | `docs/governance/EVIDENCE_POLICY.md` | 证据等级、记录字段和结论规则 |
 | `docs/governance/FEISHU_SYNC_REGISTRY.md` | 本地与飞书文档、revision 和附件映射 |

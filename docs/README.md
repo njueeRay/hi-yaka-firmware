@@ -9,7 +9,7 @@
 | 治理 | [证据政策](governance/EVIDENCE_POLICY.md) | 证据等级和发布结论规则 |
 | 治理 | [飞书同步登记](governance/FEISHU_SYNC_REGISTRY.md) | 本地与飞书映射 |
 | 架构 | [固件总体架构](yaka/firmware-architecture.md) | 分层、数据流和小智复用边界 |
-| 硬件 | [硬件设计与研发主文档](hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md) | 硬件事实、接口、制造、日志与附件入口 |
+| 项目主文档 | [硬件设计与研发主文档](hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md) | 阶段规划、技术链路、材料索引、工作日志与附件入口 |
 | 产品 | [产品数据与使用手册](product/PRODUCT_DATA_AND_USER_MANUAL.md) | 当前可用能力、操作和限制 |
 | 阶段 | [M1 基线](yaka/m1-baseline.md) | 当前最小板级启动范围 |
 
