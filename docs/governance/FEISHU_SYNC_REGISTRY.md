@@ -19,6 +19,8 @@
 | `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [08 YaKa 3.0 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 24 | 已按项目操作台结构重构并回读，五个权威附件保留 |
 | 历史仓库与旧资料归档规则 | [99 历史归档索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 5 | 已追加新旧仓库边界并回读 |
 
+最近一次主文档结构同步对应本地提交：`a0a4f3b`（2026-10-29）。
+
 ## 2. 附件登记
 
 | 附件 | 目标文档 | SHA-256 | 飞书文件 Token | 状态 |
