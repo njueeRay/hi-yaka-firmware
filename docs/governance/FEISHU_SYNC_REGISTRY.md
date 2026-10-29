@@ -8,18 +8,20 @@
 
 | 本地事实源/治理对象 | 飞书文档 | Token | Revision | 2026-10-29 状态 |
 |---|---|---|---:|---|
-| `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 项目首页与版本索引](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 26 | 已追加双仓库发布策略并回读 |
+| `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 项目首页与版本索引](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 27 | 已索引 09/10 和 Velxio 评估并回读 |
 | 产品需求摘要与状态机 | [01 YaKa 3.x 产品需求与状态机](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 4 | 已追加产品边界并回读 |
 | 硬件/固件接口摘要 | [02 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 18 | 已按 R1.6 附件复核并回读 I²C 契约 |
 | 仓库、上游与技术决策 | [03 版本、决策与变更日志](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 11 | 已记录私有开发/公开快照决策并回读 |
-| 外部资料治理 | [04 外部参考与调研库](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 4 | 已追加来源优先级并回读 |
+| 外部资料治理与 `docs/research/VELXIO_SIMULATION_EVALUATION.md` | [04 外部参考与调研库](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 7 | 已登记 Velxio 评估、附件和限时 spike 结论并回读 |
 | `docs/governance/EVIDENCE_POLICY.md` | [05 验证、缺陷与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 4 | 已追加 L0–L3 证据规则并回读 |
 | `docs/governance/FIRMWARE_PRD.md` | [06 YaKa 3.0 固件 PRD](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 4 | 新建、附件上传、目录回读完成 |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [07 YaKa 3.0 产品数据与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 2 | 新建并完成目录回读 |
-| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [08 YaKa 3.0 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 25 | 项目操作台结构及公开仓库日志已回读，五个权威附件保留 |
+| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [08 YaKa 3.0 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 32 | 项目材料已索引 09/10，工作日志已按周归并，六个权威附件保留并回读 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [09 YaKa 3.0 硬件模块连接与固件接口契约](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 3 | 新建并完成目录回读；Markdown 附件上传到 08 |
+| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [10 YaKa 3.0 开发协作与文档规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 5 | 新建、Markdown 附件上传并完成目录回读 |
 | 历史仓库与旧资料归档规则 | [99 历史归档索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 6 | 已记录历史/私有/公开三仓库边界并回读 |
 
-最近一次主文档结构同步对应本地提交：`a0a4f3b`（2026-10-29）。
+本轮主文档、09/10 和 Velxio 评估同步以本登记文件所在 Git 提交为准（2026-10-29）。
 
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）。
 
@@ -33,6 +35,9 @@
 | `docs/hardware/attachments/yaka-3.0-pcb-comprehensive-audit-and-eco-spec.md` | 08 硬件主文档 | `fe0129892773decae14c210b9e4db0402e42ffb7e46f25444fabb7fbd2378455` | `H5TPb0JwLo9OwxxXPMMcyBnQnLd` | 已上传 |
 | `docs/hardware/attachments/yaka-3.0-prefreeze-release-manufacturing-and-sourcing-checklist.md` | 08 硬件主文档 | `21827082c722903b4b8ac7c6289d42e3f838cc548a14e96d565cc6aa1ca03c90` | `DnyPbFCe9o5hQ7xX1CzcVrBjn5e` | 已上传 |
 | `docs/hardware/attachments/yaka-3.0-procurement-and-consignment-list.csv` | 08 硬件主文档 | `10a8a83fbe50177ba737962a3b2a028e0196384ff88f6b26f9ace4e475a4fc46` | `XeMxbTcEZoqMUuxkN8jcMxHnngz` | 已上传 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | 08 硬件主文档 | `7054463d187430309db1d0a751759d2e0193af359f53a625600fa16aa07913ea` | `DRy0bQ6dIobLjOx5WO6cVcpsnoc` | 已上传并在 3.2 索引 09 原生文档 |
+| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | 10 开发协作与文档规范 | `2b6970f4a8aa3102a443f5c0fc9b5e0bff8c04b197084d3cfd2f646961ac2d70` | `IaDebP4yBoqK0ux6Mtkc4oqhnUc` | 已上传 |
+| `docs/research/VELXIO_SIMULATION_EVALUATION.md` | 04 外部参考与调研库 | `79614967175b25c04e50eb8ac4707cd07a8cddd52c69d9b52ab81c23b672a986` | `ZsLYbpRNlomJiZx9XVAcJjCUnHe` | 已上传并补充原生摘要 |
 
 ## 3. 同步与冲突规则
 
