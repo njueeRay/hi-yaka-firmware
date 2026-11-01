@@ -34,6 +34,7 @@
 | 硬件接口 | [硬件连接与固件接口表](hardware/HARDWARE_MODULE_INTERFACES.md) | GPIO、总线、模块连接、初始化顺序和首板验证矩阵 |
 | 产品 | [产品规格与使用手册](product/PRODUCT_DATA_AND_USER_MANUAL.md) | 当前可用能力、操作和限制 |
 | 阶段 | [M1 基线](yaka/m1-baseline.md) | 当前最小板级启动范围 |
+| 验证 | [首板验证与证据包](bringup/README.md) | 限流上电、基础 bring-up、模块矩阵、M1–M7 证据映射和记录工具 |
 | 技术调研 | [Velxio 前置仿真评估](research/VELXIO_SIMULATION_EVALUATION.md) | C6 仿真覆盖、限制、接入方式和限时 spike 判据 |
 
 ## 飞书协作入口

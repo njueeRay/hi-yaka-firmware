@@ -23,6 +23,7 @@
 | `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | 项目操作台：阶段规划、跨域链路、材料索引与连续研发日志；详细硬件事实留在专项附件 |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | 对用户和测试人员可见的产品数据与操作 |
 | `docs/governance/EVIDENCE_POLICY.md` | 证据等级、记录字段和结论规则 |
+| `docs/bringup/` 与 `scripts/hi_yaka_evidence.py` | 首板操作顺序、模块测试矩阵、M1–M7 证据映射和不可覆盖的实板记录包 |
 | `docs/governance/FEISHU_SYNC_REGISTRY.md` | 本地与飞书文档、revision 和附件映射 |
 
 产品 PRD 和 Owner 决策台账作为项目 skill 的版本化 reference 保存，是跨硬件、固件和应用的项目资料；固件仓库内的 `FIRMWARE_PRD.md` 只负责把已批准产品要求翻译成固件合同，不得取代产品 PRD。`projects/yaka/docs/` 下同名文件是本次迁移来源，不再作为 skill 的唯一依赖。
