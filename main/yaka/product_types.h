@@ -114,6 +114,7 @@ enum class ProductEventType : uint8_t {
     kDialogueListening,
     kDialogueProcessing,
     kDialogueSpeaking,
+    kDialogueInterrupted,
     kDialogueEnded,
     kRecordingRequested,
     kRecordingStopped,

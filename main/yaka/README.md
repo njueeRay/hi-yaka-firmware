@@ -1,6 +1,6 @@
 # HiYaKa 产品内核
 
-本目录承载 HiYaKa 独有的产品协调与领域服务，不复制小智协议、音频引擎或网络栈。当前 PH2 只建立可宿主测试的产品内核和端口合同；真实硬件适配仍由板级目录负责，产品功能仍是 L0 状态。
+本目录承载 HiYaKa 独有的产品协调与领域服务，不复制小智协议、音频引擎或网络栈。PH2 已建立可宿主测试的产品内核和端口合同；PH3 在此基础上增加无实板业务纵向闭环。真实硬件适配仍由板级目录负责，当前结论仍只有 L0 证据。
 
 ## 1. 单写入者状态模型
 
@@ -20,9 +20,19 @@
 
 `product_ports.h` 定义显示、输入、音频、存储、网络、NFC、IMU、反馈、电源和 OTA 十类端口。产品内核只依赖这些接口，不包含 GPIO、I²C 地址或具体器件类。
 
-`simulated_product_ports.h` 提供无实板模拟实现和调用计数，可注入音频、存储、网络、NFC、电源或 OTA 拒绝，用于验证异常和回滚路径。模拟通过不代表真实外设通过。
+`simulated_product_ports.h` 提供无实板模拟实现和调用计数，可注入音频、存储、网络、NFC、电源或 OTA 拒绝，并可分别关闭 RGB、灯阵、振动和提示音通道，用于验证异常、降级和回滚路径。模拟通过不代表真实外设通过。
 
-## 3. 有界队列合同
+## 3. PH3 业务闭环
+
+- `business_flows.*`：提供不冻结最终产品语义的可配置实体键映射、200×320 页面状态模型，以及对话各阶段的有界 deadline；
+- `ProductController`：对话播放可被打断但不退出会话；断网时进入 `interrupted`，网络恢复后回到 `connecting`；取消或超时会明确收尾音频和网络端口；
+- `recording_store.*`：录音按 `.part → checkpoint → sync → finalize` 生命周期提交；启动恢复只保留最后一次已同步 checkpoint，丢弃零长度或被截断到 checkpoint 之前的文件；
+- `RecordingStoragePortAdapter`：把可靠录音存储接入既有 `StoragePort`，避免产品控制器依赖文件系统 API；
+- host backend：在真实宿主目录中模拟提交、满盘、截断、重复启动和随机中断；它只是行为验证器，最终文件格式、分段规则和 TF 卡参数仍待产品与实板冻结。
+
+`RecordingBackend` 要求真正的 TF/FatFs 适配器实现同步和同目录最终化语义。仅调用 `rename()` 而未先同步数据，不满足合同；同样，不得把宿主文件系统测试等同于 FAT 掉电安全结论。
+
+## 4. 有界队列合同
 
 | 队列 | 容量 | 满载策略 | 超时策略 | 观测字段 |
 |---|---:|---|---|---|
@@ -32,13 +42,13 @@
 
 `BoundedQueue` 使用调用方可确定的 `std::array` 容量，不以 `deque`/`vector` 扩容积压。当前实现用 mutex 支持多生产者；接入 ESP-IDF 任务时仍需验证延迟和栈，不允许从 ISR 直接调用该 C++ 队列。
 
-## 4. 能力健康
+## 5. 能力健康
 
 每项能力使用同一套状态：`unavailable / initializing / ready / degraded / failed`。`degraded` 仍可由产品层有条件使用；`failed` 只在当前前台任务依赖该能力时进入错误页。IMU 等非关键能力单独失败不得让首页失去返回路径。
 
 能力集合：显示、输入、采集音频、播放音频、存储、网络、NFC、IMU、反馈、电源、OTA。
 
-## 5. 首版错误码
+## 6. 首版错误码
 
 | 范围 | 错误码 | 含义 |
 |---|---:|---|
@@ -57,7 +67,7 @@
 
 错误码只描述稳定类别，不把 ESP-IDF 返回值、器件寄存器值或用户数据编码进公开诊断。
 
-## 6. 诊断字段
+## 7. 诊断字段
 
 | 字段 | 来源 | 用途 |
 |---|---|---|
@@ -71,7 +81,7 @@
 
 后续实板诊断还必须增加内部堆最小值、最大连续块、任务栈高水位、音频丢帧、UI 刷新和复位原因；PH2 不伪造这些数据。
 
-## 7. 测试
+## 8. 测试
 
 ```bash
 cmake -S tests/yaka_host -B /tmp/hi-yaka-host
@@ -79,13 +89,16 @@ cmake --build /tmp/hi-yaka-host
 ctest --test-dir /tmp/hi-yaka-host --output-on-failure
 ```
 
-覆盖固定容量满载策略、多生产者、启动、对话、录音提交、取消、超时、重复事件、OTA 确认、受控关机和非关键能力失败。
+覆盖固定容量满载策略、多生产者、启动、对话打断/断网恢复/取消/超时、可配置按键、200×320 页面流、可靠录音提交、满盘、截断、重复启动、随机中断、OTA 确认、受控关机和非关键能力降级。
 
-## 8. 设计证据
+## 9. 设计证据
 
 - [ESP-IDF 6.1 FreeRTOS 文档](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32c6/api-reference/system/freertos_idf.html)：确认任务/同步原语属于 IDF 运行时边界；
 - [FreeRTOS Kernel `queue.h`](https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/main/include/queue.h)：静态队列由调用方提供存储、容量固定，满载返回明确结果；
 - [Zephyr State Machine Framework](https://docs.zephyrproject.org/latest/services/smf/index.html)：参考集中状态执行、转换和退出动作的组织方式；
 - [小智 DeviceStateMachine](https://github.com/78/xiaozhi-esp32/blob/main/main/device_state_machine.cc)：保持上游会话状态独立，并继承重复转换 no-op 的行为。
+- [ESP-IDF 6.1 FatFs 文档](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-reference/storage/fatfs.html)：确认 TF/FAT 经 VFS 暴露 POSIX API，`f_sync`/即时同步属于一致性与性能的显式权衡；
+- [littlefs 设计文档](https://github.com/littlefs-project/littlefs/blob/master/DESIGN.md)：参考断电恢复、固定内存和原子移动的设计原则，但不把 littlefs 的保证错误套用到 TF/FAT；
+- [Zephyr Input 文档](https://docs.zephyrproject.org/latest/services/input/index.html)：参考“物理输入事件与上层动作解耦”的事件模型。
 
 这些资料只支持软件结构决策；HiYaKa 的硬件接口仍以活体 EDA、封存审计和本仓库硬件契约为准。

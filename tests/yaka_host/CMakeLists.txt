@@ -5,8 +5,10 @@ enable_testing()
 
 add_executable(hi_yaka_product_core_test
     product_core_test.cc
+    ../../main/yaka/business_flows.cc
     ../../main/yaka/capability_registry.cc
     ../../main/yaka/product_controller.cc
+    ../../main/yaka/recording_store.cc
 )
 
 target_include_directories(hi_yaka_product_core_test PRIVATE ../../main/yaka)

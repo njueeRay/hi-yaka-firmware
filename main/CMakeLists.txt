@@ -942,8 +942,10 @@ list(APPEND SOURCES ${BOARD_SOURCES})
 
 if(CONFIG_BOARD_TYPE_HI_YAKA)
     list(APPEND SOURCES
+        "yaka/business_flows.cc"
         "yaka/capability_registry.cc"
         "yaka/product_controller.cc"
+        "yaka/recording_store.cc"
     )
     list(APPEND INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/yaka")
 endif()

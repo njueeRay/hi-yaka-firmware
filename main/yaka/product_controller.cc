@@ -101,6 +101,9 @@ ProductController::HandleResult ProductController::Handle(const ProductEvent& ev
             snapshot_.connectivity = Connectivity::kOnline;
             if (snapshot_.foreground == ForegroundMode::kProvisioning) {
                 snapshot_.foreground = ForegroundMode::kHome;
+            } else if (snapshot_.foreground == ForegroundMode::kDialogue &&
+                       snapshot_.dialogue == DialoguePhase::kInterrupted) {
+                snapshot_.dialogue = DialoguePhase::kConnecting;
             }
             return HandleResult::kChanged;
 
@@ -110,8 +113,10 @@ ProductController::HandleResult ProductController::Handle(const ProductEvent& ev
             }
             snapshot_.connectivity = Connectivity::kOffline;
             if (snapshot_.foreground == ForegroundMode::kDialogue) {
-                snapshot_.dialogue = DialoguePhase::kFailed;
-                EnterError(ErrorCode::kNetworkUnavailable);
+                if (ports_.audio != nullptr) {
+                    ports_.audio->InterruptDialogueOutput();
+                }
+                snapshot_.dialogue = DialoguePhase::kInterrupted;
             }
             return HandleResult::kChanged;
 
@@ -137,6 +142,16 @@ ProductController::HandleResult ProductController::Handle(const ProductEvent& ev
                 return HandleResult::kIgnored;
             }
             snapshot_.dialogue = DialoguePhase::kSpeaking;
+            return HandleResult::kChanged;
+        case ProductEventType::kDialogueInterrupted:
+            if (snapshot_.foreground != ForegroundMode::kDialogue ||
+                snapshot_.dialogue == DialoguePhase::kInterrupted) {
+                return HandleResult::kIgnored;
+            }
+            if (ports_.audio != nullptr) {
+                ports_.audio->InterruptDialogueOutput();
+            }
+            snapshot_.dialogue = DialoguePhase::kInterrupted;
             return HandleResult::kChanged;
         case ProductEventType::kDialogueEnded:
             if (snapshot_.foreground != ForegroundMode::kDialogue) {
@@ -198,6 +213,7 @@ ProductController::HandleResult ProductController::Handle(const ProductEvent& ev
         case ProductEventType::kCancel:
             return CancelActiveMode();
         case ProductEventType::kOperationTimedOut:
+            CancelActiveMode();
             EnterError(event.error == ErrorCode::kNone ? ErrorCode::kOperationTimedOut : event.error);
             return HandleResult::kChanged;
         case ProductEventType::kCapabilityChanged:

@@ -13,6 +13,14 @@ enum class FeedbackSignal : uint8_t {
     kError,
 };
 
+enum class FeedbackChannel : uint8_t {
+    kRgb,
+    kLedArray,
+    kVibration,
+    kTone,
+    kCount,
+};
+
 class DisplayPort {
 public:
     virtual ~DisplayPort() = default;
@@ -29,6 +37,7 @@ class AudioPort {
 public:
     virtual ~AudioPort() = default;
     virtual bool BeginDialogue() = 0;
+    virtual void InterruptDialogueOutput() = 0;
     virtual void CancelDialogue() = 0;
     virtual bool StartRecordingCapture() = 0;
     virtual void StopRecordingCapture() = 0;
