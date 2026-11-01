@@ -4,7 +4,7 @@
 > 最近更新：2026-11-02
 > 适用硬件：YaKa 3.0 / ESP32-C6  
 > 适用软件基线：`xiaozhi-esp32 v2.5.2`、ESP-IDF `v6.1`  
-> 当前实现阶段：PH0/PH1 已完成；PH2 架构评审中；实板 M1 尚未开始
+> 当前实现阶段：PH0/PH1 已完成；PH2 产品内核正在实现和验证；实板 M1 尚未开始
 
 本文回答后续开发中最容易混淆的五个问题：产品究竟要完成什么、现有硬件实际能做什么、小智上游哪些能力可以直接复用、YaKa 必须自行开发什么，以及代码应按什么边界演进。
 
@@ -157,7 +157,7 @@ PCA9557 上电必须先写 Output Port=`0x40`，再写 Configuration=`0x38`，�
 | Flash/OTA | `partitions/v2/16m_c3.csv`、`main/ota.*`、`main/settings.*`、`main/assets.*` | 双 OTA 与资源分区、OTA transport 和配置基础已存在 | 增加用户确认、低电量/录音互斥、启动自检、确认与回滚策略 |
 | UI/反馈 | 通用 `display/`、`led/`、`notify_player.*`；YaKa 当前为 `NoDisplay`/`NoLed` | 上游基础设施可复用，但没有 YaKa 200×320 页面、实体键焦点、RGB/振动语义 | 计划 `main/yaka/feedback_service.*` 与 YaKa display/driver 接入 |
 | 本地录音/文件 | 当前无 YaKa 实现 | 没有 recorder、可靠 `.part` 提交、TF 恢复和产品文件索引 | 计划 `main/yaka/recorder_service.*`、`storage_service.*`、capture adapter |
-| 产品协调 | 当前无 `main/yaka/` | 当前只有小智会话态，没有 YaKa 正交产品状态和能力表 | 计划 `main/yaka/product_controller.*`、`xiaozhi_adapter.*`、`capability_registry.*` |
+| 产品协调 | `main/yaka/product_controller.*`、`product_types.h`、`bounded_queue.h`、`capability_registry.*`、`product_ports.h`、`simulated_product_ports.h` | PH2 已建立可宿主测试的正交产品状态、固定容量队列、能力健康、十类可替换端口和模拟实现；尚未接入真实 `Application` 与板级驱动 | PH3 通过窄适配层接入对话、录音和页面模拟；实板驱动仍按 M1–M7 验证 |
 
 ## 5. 目标软件架构
 
@@ -198,7 +198,7 @@ ChatChat HiYaKa 以目录 `main/boards/chatchat/hi-yaka` 作为唯一硬件真�
 
 ### 5.3 YaKa 领域服务层
 
-下列 `main/yaka/` 文件是通过架构评审后的建议落点，不是当前代码事实，也不允许一次性复制旧仓库组件：
+下列 `main/yaka/` 文件是通过架构评审后的目标落点。PH2 已创建产品内核、端口、模拟实现和能力表；其余领域服务仍按阶段新增，不允许一次性复制旧仓库组件：
 
 | 服务 | 唯一职责 |
 |---|---|

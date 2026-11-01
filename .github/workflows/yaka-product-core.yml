@@ -1,0 +1,58 @@
+name: HiYaKa product core
+
+on:
+  pull_request:
+    paths:
+      - "main/yaka/**"
+      - "tests/yaka_host/**"
+      - "main/CMakeLists.txt"
+      - ".github/workflows/yaka-product-core.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "main/yaka/**"
+      - "tests/yaka_host/**"
+      - "main/CMakeLists.txt"
+      - ".github/workflows/yaka-product-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  host-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure host tests
+        run: cmake -S tests/yaka_host -B build/yaka_host -DCMAKE_BUILD_TYPE=Release
+      - name: Build host tests
+        run: cmake --build build/yaka_host --parallel 2
+      - name: Run host tests
+        run: ctest --test-dir build/yaka_host --output-on-failure
+      - name: Validate board selection contract
+        run: python -m unittest scripts.tests.test_hi_yaka_board -v
+
+  hi-yaka-firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: espressif/idf:v6.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build HiYaKa with ESP-IDF 6.1
+        shell: bash
+        run: |
+          source "$IDF_PATH/export.sh"
+          idf.py --version
+          python scripts/build.py chatchat/hi-yaka \
+            --name hi-yaka \
+            --language zh-CN \
+            --wake-word disabled
+      - name: Upload merged firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: hi-yaka-${{ github.sha }}
+          path: build/merged-binary.bin
+          if-no-files-found: error
