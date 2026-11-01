@@ -9,7 +9,8 @@ description: 维护 YaKa 3.0 的产品、硬件、固件、验证证据及飞书
 
 根据任务只加载相关 reference：
 
-- 产品范围、交互、状态机或需求 ID：读 [10-product-and-prd.md](references/10-product-and-prd.md)。
+- 产品范围、交互、状态机或需求 ID：读 [10-product-and-prd.md](references/10-product-and-prd.md)，再按其中入口读取完整产品 PRD。
+- 当前角色、Owner 决策、待确认事项或“谁来做什么”：读 [15-owner-decisions-and-todos.md](references/15-owner-decisions-and-todos.md)。
 - 原理图、PCB、器件、引脚、总线、SMT、采购或首板：读 [20-hardware-and-manufacturing.md](references/20-hardware-and-manufacturing.md)。
 - 固件架构、小智复用、ESP-IDF、分支或上游同步：读 [30-firmware-and-upstream.md](references/30-firmware-and-upstream.md)。
 - 验证、日志、缺陷、资源预算、发布结论：读 [40-validation-and-evidence.md](references/40-validation-and-evidence.md)。

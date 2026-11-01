@@ -229,6 +229,8 @@ Stage 2 退出条件不是“单次演示成功”，而是每个模块拥有 L2
 - 小智上游：`78/xiaozhi-esp32`；
 - 飞书总目录：[YaKa 3.x](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)；
 - 双端映射和 revision：[飞书同步登记](../governance/FEISHU_SYNC_REGISTRY.md)。
+- [当前角色、Owner 决策与待办](../../.agents/skills/yaka-project/references/yaka-3.0-owner-decisions-and-todos.md)；
+- [飞书当前角色、Owner 决策与待办](https://scnlb1lk96sb.feishu.cn/docx/Y5SqdV9zloa3eLxQZALcTDQ4nOe)；
 - [本地开发协作与文档规范](../governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md)；
 - [飞书开发协作与文档规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c)；
 - [Velxio 前置仿真评估](../research/VELXIO_SIMULATION_EVALUATION.md)：仅作为 L0.5 可选通道，不替代实板验证。

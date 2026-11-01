@@ -15,6 +15,8 @@
 
 | 文档 | 负责内容 |
 |---|---|
+| `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | 产品级 PRD：用户、场景、产品范围、交互、需求 ID 和产品验收；同步到飞书“01 产品需求与交互状态” |
+| `.agents/skills/yaka-project/references/yaka-3.0-owner-decisions-and-todos.md` | 当前角色、已冻结/暂行决定、待 Owner 裁决和团队输入；同步到飞书“当前角色、Owner 决策与待办” |
 | `docs/governance/PROJECT_CHARTER.md` | 北极星、范围、决策权限和完成定义 |
 | `docs/governance/FIRMWARE_PRD.md` | 固件需求、里程碑、兼容合同和验收 |
 | `docs/yaka/firmware-architecture.md` | 软件分层、数据流和上游复用边界 |
@@ -22,6 +24,8 @@
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | 对用户和测试人员可见的产品数据与操作 |
 | `docs/governance/EVIDENCE_POLICY.md` | 证据等级、记录字段和结论规则 |
 | `docs/governance/FEISHU_SYNC_REGISTRY.md` | 本地与飞书文档、revision 和附件映射 |
+
+产品 PRD 和 Owner 决策台账作为项目 skill 的版本化 reference 保存，是跨硬件、固件和应用的项目资料；固件仓库内的 `FIRMWARE_PRD.md` 只负责把已批准产品要求翻译成固件合同，不得取代产品 PRD。`projects/yaka/docs/` 下同名文件是本次迁移来源，不再作为 skill 的唯一依赖。
 
 ## 变更合同
 
