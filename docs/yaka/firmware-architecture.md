@@ -4,7 +4,7 @@
 > 最近更新：2026-11-02
 > 适用硬件：ChatChat HiYaKa / ESP32-C6
 > 适用软件基线：`xiaozhi-esp32 v2.5.2`、ESP-IDF `v6.1`  
-> 当前实现阶段：PH0/PH1/PH2 已完成；PH3 无实板业务闭环正在推进；实板 M1 尚未开始
+> 当前实现阶段：PH0–PH3 已完成；PH4 OTA、资源预算与故障注入正在推进；实板 M1 尚未开始
 
 本文回答后续开发中最容易混淆的五个问题：产品究竟要完成什么、现有硬件实际能做什么、小智上游哪些能力可以直接复用、HiYaKa 必须自行开发什么，以及代码应按什么边界演进。
 
@@ -25,7 +25,7 @@ PRD 与硬件审计原文保存在 HiYaKa 项目资料区，不复制进固件�
 
 ### 0.2 架构图与阅读顺序
 
-详细架构图不是把“计划”伪装成“现状”，因此所有节点都带状态语义：蓝色为当前复用的小智代码，绿色为已经存在的 HiYaKa 实现，橙色虚线为 PH3–PH5 目标，红色为约束或验证门禁。图中 PH2 节点的颜色仍反映 v1.3 评审时状态；下次架构图版本更新时统一转为“已实现”，不得用旧图颜色否定本页代码事实。
+详细架构图不是把“计划”伪装成“现状”，因此所有节点都带状态语义：蓝色为当前复用的小智代码，绿色为已经存在的 HiYaKa 实现，橙色虚线为 PH4–PH5 目标，红色为约束或验证门禁。图中 PH2/PH3 节点的颜色仍反映 v1.3 评审时状态；下次架构图版本更新时统一转为“已实现”，不得用旧图颜色否定本页代码事实。
 
 | 页 | 主题 | 应回答的问题 | 可编辑源与预览 |
 |---:|---|---|---|
@@ -157,7 +157,7 @@ PCA9557 上电必须先写 Output Port=`0x40`，再写 Configuration=`0x38`，�
 | Flash/OTA | `partitions/v2/16m_c3.csv`、`main/ota.*`、`main/settings.*`、`main/assets.*` | 双 OTA 与资源分区、OTA transport 和配置基础已存在 | 增加用户确认、低电量/录音互斥、启动自检、确认与回滚策略 |
 | UI/反馈 | 通用 `display/`、`led/`、`notify_player.*`；YaKa 当前为 `NoDisplay`/`NoLed` | 上游基础设施可复用，但没有 YaKa 200×320 页面、实体键焦点、RGB/振动语义 | 计划 `main/yaka/feedback_service.*` 与 YaKa display/driver 接入 |
 | 本地录音/文件 | 当前无 YaKa 实现 | 没有 recorder、可靠 `.part` 提交、TF 恢复和产品文件索引 | 计划 `main/yaka/recorder_service.*`、`storage_service.*`、capture adapter |
-| 产品协调 | `main/yaka/product_controller.*`、`product_types.h`、`bounded_queue.h`、`capability_registry.*`、`product_ports.h`、`simulated_product_ports.h` | PH2 已建立可宿主测试的正交产品状态、固定容量队列、能力健康、十类可替换端口和模拟实现；尚未接入真实 `Application` 与板级驱动 | PH3 通过窄适配层接入对话、录音和页面模拟；实板驱动仍按 M1–M7 验证 |
+| 产品协调 | `main/yaka/product_controller.*`、`product_types.h`、`bounded_queue.h`、`capability_registry.*`、`product_ports.h`、`simulated_product_ports.h`、`business_flows.*`、`recording_store.*` | PH2/PH3 已建立正交产品状态、固定容量队列、能力健康、十类端口、可配置输入、对话恢复、可靠录音和 200×320 页面模型；尚未接入真实 `Application` 与板级驱动 | PH4 增加 OTA/资源门禁；实板驱动仍按 M1–M7 验证 |
 
 ## 5. 目标软件架构
 
@@ -336,4 +336,4 @@ Raynode 正式工作区为 `/srv/projects/hi-yaka-firmware`，使用固定 `espr
 
 ## 13. 当前状态
 
-截至 2026-11-02：PH0 文档/接口基线、PH1 可复现构建/板型安全骨架和 PH2 产品内核已有 L0 证据。PH2 通过私有仓库 PR #1 合入：唯一产品协调者、十类可替换端口、固定容量队列、能力健康表、模拟端口和 host tests 已存在；ESP-IDF 6.1 主目标构建、board contract 与 18 个代表性上游板型构建全部通过。PH3 开始推进无实板业务纵向闭环。真实硬件仍未连接，因此不能把 M1 标记为完成；LCD、TF、真实音频、NFC/IMU、按键产品语义、RGB/振动、电池曲线和 OTA 实板路径均未获得 L1/L2 证据。
+截至 2026-11-02：PH0–PH3 已取得 L0 证据。PH2 通过 PR #1 建立产品内核；PH3 通过 PR #3 建立可配置按键映射、对话打断/断网恢复/超时、checkpoint 录音生命周期、宿主文件系统故障注入、辅助能力降级和 200×320 页面模型。两阶段的 ESP-IDF 6.1 主目标、host/board contract 与 18 个代表性上游板型构建均通过。PH4 开始推进 OTA、资源预算与故障注入。真实硬件仍未连接，宿主文件系统也不能证明 TF/FAT 掉电安全，因此 M1 及全部实板功能仍无 L1/L2 证据。
