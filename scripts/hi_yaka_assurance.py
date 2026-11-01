@@ -99,8 +99,21 @@ def validate_source_budgets(policy: dict[str, Any], root: Path = ROOT) -> dict[s
     return actual
 
 
+def parse_idf_size_output(text: str) -> dict[str, Any]:
+    """Extract the JSON report from idf.py's mixed action-log/stdout stream."""
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        try:
+            candidate, _ = decoder.raw_decode(text, match.start())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(candidate, dict) and isinstance(candidate.get("layout"), list):
+            return candidate
+    raise ValueError("unable to find an ESP-IDF size JSON object in command output")
+
+
 def validate_size_report(policy: dict[str, Any], report_path: Path) -> dict[str, Any]:
-    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report = parse_idf_size_output(report_path.read_text(encoding="utf-8-sig"))
     layout = report.get("layout")
     if not isinstance(layout, list) or not layout:
         raise ValueError("ESP-IDF size report has no layout array")

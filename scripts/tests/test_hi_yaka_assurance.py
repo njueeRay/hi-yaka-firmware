@@ -53,6 +53,15 @@ class HiYaKaAssuranceTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "exceeds policy"):
                 assurance.validate_size_report(policy, path)
 
+    def test_idf_action_log_can_wrap_size_json(self):
+        report = assurance.parse_idf_size_output(
+            "Executing action: size\n"
+            "Running ninja in directory /tmp/build\n"
+            '{"version":"1.2","layout":[{"name":"DIRAM","total":100,"used":10}]}\n'
+            "Done\n"
+        )
+        self.assertEqual(report["layout"][0]["used"], 10)
+
     def test_provenance_hashes_every_input(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
