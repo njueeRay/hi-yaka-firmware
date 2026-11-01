@@ -1,8 +1,8 @@
-# YaKa 3.0 当前角色、Owner 决策与待办
+# HiYaKa 当前角色、Owner 决策与待办
 
 > 更新时间：2026-11-01（Asia/Shanghai）  
 > 文档状态：当前决策台账  
-> 适用范围：YaKa 3.0 产品、硬件、固件、制造、验证与文档治理  
+> 适用范围：HiYaKa 产品、硬件、固件、制造、验证与文档治理
 > 目的：只保留仍生效的决定、真正需要 Owner 裁决的事项和各角色当前责任；历史推演、已经关闭的 ECO 和普通工程任务不继续伪装成 Owner 待办。
 
 ## 1. 使用规则
@@ -31,13 +31,13 @@
 
 | ID | 决定 | 状态/边界 |
 |---|---|---|
-| `YAKA-DEC-001` | YaKa 3.0 以 AI 语音对话和 TF 本地录音为双核心 | 已冻结；NFC/IMU/RGB/振动服务于主线 |
+| `YAKA-DEC-001` | HiYaKa 以 AI 语音对话和 TF 本地录音为双核心 | 已冻结；NFC/IMU/RGB/振动服务于主线 |
 | `YAKA-DEC-002` | 产品为 Wi-Fi-only、非触控屏幕和实体键交互 | 已冻结；不含 4G/SIM、5 GHz Wi-Fi、主动蓝牙音频、摄像头、触摸和游戏 |
 | `YAKA-DEC-003` | `MASTER_SW` 是正常整机硬电源开关 | 已冻结；OFF 后整机硬断电，PWR_A/PWR_B 无法唤醒 |
 | `YAKA-DEC-004` | 本地存储采用 TF / SDSPI | 已冻结；无 card-detect，可靠录音和掉电恢复必须实测 |
 | `YAKA-DEC-005` | 外置 Flash 为 16 MiB，ESP32-C6 无 PSRAM | 已冻结；首板按 DIO 保守带起，具体性能和 OTA 分区待实板验证 |
 | `YAKA-DEC-006` | NFC 首发只读 | 已冻结；具体卡片数据和业务动作仍待定义 |
-| `YAKA-DEC-007` | OTA 进入 3.0 发布范围 | 已冻结；必须用户确认、包校验、失败回滚和可诊断恢复 |
+| `YAKA-DEC-007` | OTA 进入 HiYaKa 当前发布范围 | 已冻结；必须用户确认、包校验、失败回滚和可诊断恢复 |
 | `YAKA-DEC-008` | 私有仓库保存完整开发真值，`ChatChatTech/yaka/firmware` 发布受控公开快照 | 已冻结；不迁移私有历史和内部资料 |
 | `YAKA-DEC-009` | 硬件设计为 `GO TO PROTOTYPE`，制造发布为 `CONDITIONAL GO` | LED2/CPL 工程 `HOLD` 已撤销；订单平台最终 DFM、预览和签核仍须留证 |
 
@@ -108,8 +108,8 @@
 - 固件 PRD：`projects/yaka/hi-yaka-firmware/docs/governance/FIRMWARE_PRD.md`
 - 硬件主文档：`projects/yaka/hi-yaka-firmware/docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md`
 - 硬件接口表：`projects/yaka/hi-yaka-firmware/docs/hardware/HARDWARE_MODULE_INTERFACES.md`
-- 飞书项目总览：`YaKa 3.x / 00 YaKa 3.0 项目总览与文档导航`
-- 飞书正式决策：`YaKa 3.x / 03 协作、决策与调研 / 02 决策与版本记录`
+- 飞书项目总览：`HiYaKa / 00 HiYaKa 项目总览与文档导航`
+- 飞书正式决策：`HiYaKa / 03 协作、决策与调研 / 02 决策与版本记录`
 
 
 

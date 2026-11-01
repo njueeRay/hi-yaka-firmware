@@ -16,7 +16,7 @@
 | 对外/语义板名 | `HiYaKa` | 首次需要表达归属时写“ChatChat HiYaKa”；不追加代际或版本后缀 |
 | 全小写短横线形式 | `hi-yaka` | 用于新建的仓库、构建名或其他 kebab-case 标识；不追加版本后缀 |
 | 全大写下划线形式 | `HI_YAKA` | 用于新建的宏、常量前缀或其他 UPPER_SNAKE_CASE 标识 |
-| 产品版本 | `YaKa 3.0` | 只描述当前产品版本，不转写为板名 |
+| 产品/系列语义 | `HiYaKa` | 不追加代际或版本后缀 |
 | board/build ID | `chatchat/hi-yaka`、`hi-yaka` | 用于构建命令、配置和代码追踪 |
 | 类/宏/文件 | `HiYaKaBoard`、`BOARD_TYPE_HI_YAKA`、`hi_yaka_board.cc` | 代码、测试、CI 与架构图保持一致 |
 
@@ -24,7 +24,7 @@
 
 ## 架构边界
 
-复用小智构建、Wi-Fi、协议、AudioService、Opus、LVGL、NVS 和 OTA transport。YaKa 自行维护 board/BSP、capability health、产品状态协调、本地录音、TF 恢复、实体输入、NFC 业务、反馈、电源边界与 OTA 产品策略。
+复用小智构建、Wi-Fi、协议、AudioService、Opus、LVGL、NVS 和 OTA transport。HiYaKa 自行维护 board/BSP、capability health、产品状态协调、本地录音、TF 恢复、实体输入、NFC 业务、反馈、电源边界与 OTA 产品策略。
 
 完整设计读 `docs/yaka/firmware-architecture.md`。所有产品状态只有一个协调者；ISR、驱动和后台任务只发送有界事件。I²S RX 只有一个所有者，本地录音在采集适配层分流。
 
