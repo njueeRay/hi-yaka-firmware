@@ -12,7 +12,9 @@ on:
       - "partitions/hi-yaka-16m.csv"
       - "config/hi-yaka-assurance.json"
       - "scripts/hi_yaka_assurance.py"
+      - "scripts/hi_yaka_evidence.py"
       - "scripts/tests/test_hi_yaka_assurance.py"
+      - "scripts/tests/test_hi_yaka_evidence.py"
       - ".github/workflows/yaka-product-core.yml"
   push:
     branches:
@@ -27,7 +29,9 @@ on:
       - "partitions/hi-yaka-16m.csv"
       - "config/hi-yaka-assurance.json"
       - "scripts/hi_yaka_assurance.py"
+      - "scripts/hi_yaka_evidence.py"
       - "scripts/tests/test_hi_yaka_assurance.py"
+      - "scripts/tests/test_hi_yaka_evidence.py"
       - ".github/workflows/yaka-product-core.yml"
 
 permissions:
@@ -38,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure host tests
         run: cmake -S tests/yaka_host -B build/yaka_host -DCMAKE_BUILD_TYPE=Release
       - name: Build host tests
@@ -46,7 +50,7 @@ jobs:
       - name: Run host tests
         run: ctest --test-dir build/yaka_host --output-on-failure
       - name: Validate board selection contract
-        run: python -m unittest scripts.tests.test_hi_yaka_board scripts.tests.test_hi_yaka_assurance -v
+        run: python -m unittest scripts.tests.test_hi_yaka_board scripts.tests.test_hi_yaka_assurance scripts.tests.test_hi_yaka_evidence -v
 
   hi-yaka-firmware:
     runs-on: ubuntu-latest
@@ -54,7 +58,7 @@ jobs:
     container:
       image: espressif/idf:v6.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build HiYaKa with ESP-IDF 6.1
         shell: bash
         run: |
@@ -96,7 +100,7 @@ jobs:
             build/hi-yaka-provenance.json \
             > build/SHA256SUMS
       - name: Upload traceable HiYaKa candidate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hi-yaka-${{ github.sha }}
           path: |

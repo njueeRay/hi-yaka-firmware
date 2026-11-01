@@ -28,3 +28,12 @@
 
 原始日志和附件只追加、不静默改写；修订通过新版本和 SHA-256 追踪。涉及用户内容的录音不提交 Git，只保存匿名化指标、短诊断样本的授权路径和哈希。
 
+## 6. 首板执行入口
+
+- [首板验证与证据包](../bringup/README.md)
+- [首板上电与基础验证手册](../bringup/FIRST_BOARD_VALIDATION.md)
+- [模块测试矩阵](../bringup/MODULE_TEST_MATRIX.md)
+- [证据等级与里程碑矩阵](../bringup/EVIDENCE_LEVEL_MATRIX.md)
+
+证据包由 `scripts/hi_yaka_evidence.py` 创建和校验。工具校验通过只说明记录结构、身份字段和原始证据引用完整，不自动产生 `GO` 或功能通过结论。
+

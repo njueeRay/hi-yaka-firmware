@@ -61,3 +61,7 @@ ESP32-C6 不支持外部 PSRAM，因此该 target 的 Kconfig 不提供可启用
 | I2C 地址和 PCA9557 readback | 尚需首板验证 |
 
 M1 的阶段结论只能是“软件基线可进入首板 bring-up”，不能写成“硬件适配完成”。
+
+## 6. 首板执行入口
+
+硬件到位后按[首板上电与基础验证手册](../bringup/FIRST_BOARD_VALIDATION.md)执行，并用 `scripts/hi_yaka_evidence.py` 绑定样机、固件候选和原始证据。M1 必需记录为 `power`、`flash`、`i2c` 和 `pca9557`；四项未取得可复核 L1 证据前，M1 保持未关闭。
