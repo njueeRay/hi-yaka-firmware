@@ -12,6 +12,7 @@
 #include "product_controller.h"
 #include "recording_store.h"
 #include "simulated_product_ports.h"
+#include "update_assurance.h"
 
 namespace {
 
@@ -385,6 +386,159 @@ void TestUpdateRequiresConfirmation() {
     EXPECT_EQ(fixture.simulated.calls.update_begin, 1U);
 }
 
+class FakeSignatureVerifier final : public PackageSignatureVerifier {
+public:
+    explicit FakeSignatureVerifier(bool accepted) : accepted_(accepted) {}
+    bool Verify(const UpdateManifest&) const override { return accepted_; }
+
+private:
+    bool accepted_;
+};
+
+class FakeMigrationStore final : public ConfigurationMigrationStore {
+public:
+    bool Snapshot() override {
+        ++snapshots;
+        previous = value;
+        return snapshot_ok;
+    }
+    bool Apply() override {
+        ++applies;
+        value = 2;
+        return apply_ok;
+    }
+    bool Validate() override {
+        ++validations;
+        return validate_ok;
+    }
+    bool Commit() override {
+        ++commits;
+        return commit_ok;
+    }
+    bool Restore() override {
+        ++restores;
+        value = previous;
+        return true;
+    }
+
+    bool snapshot_ok{true};
+    bool apply_ok{true};
+    bool validate_ok{true};
+    bool commit_ok{true};
+    int value{1};
+    int previous{0};
+    uint32_t snapshots{0};
+    uint32_t applies{0};
+    uint32_t validations{0};
+    uint32_t commits{0};
+    uint32_t restores{0};
+};
+
+UpdateManifest ValidManifest() {
+    return UpdateManifest{
+        "hi-yaka",
+        "1.3.0",
+        "1.0.0",
+        1,
+        3,
+        1024,
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "test-signature",
+    };
+}
+
+void TestUpdateManifestPolicyRejectsUnsafePackages() {
+    FakeSignatureVerifier accepted(true);
+    FakeSignatureVerifier rejected(false);
+    UpdatePolicy policy{2, "1.2.0"};
+    auto manifest = ValidManifest();
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted), UpdateRejection::kNone);
+
+    manifest.board = "another-board";
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted), UpdateRejection::kWrongBoard);
+    manifest = ValidManifest();
+    manifest.version = "1.2.0";
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted),
+              UpdateRejection::kVersionNotNewer);
+    manifest = ValidManifest();
+    manifest.minimum_installed_version = "1.2.1";
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted),
+              UpdateRejection::kInstalledVersionTooOld);
+    manifest = ValidManifest();
+    manifest.maximum_hardware_revision = 1;
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted),
+              UpdateRejection::kHardwareIncompatible);
+    manifest = ValidManifest();
+    manifest.image_size = UpdatePolicy::kMaximumImageBytes + 1;
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted),
+              UpdateRejection::kImageTooLarge);
+    manifest = ValidManifest();
+    manifest.image_sha256 = "not-a-sha256";
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, accepted),
+              UpdateRejection::kInvalidDigest);
+    manifest = ValidManifest();
+    EXPECT_EQ(ValidateUpdateManifest(manifest, policy, rejected),
+              UpdateRejection::kInvalidSignature);
+}
+
+void TestUpdateStateMachineCoversRecoveryPaths() {
+    UpdateAssuranceStateMachine success;
+    EXPECT_TRUE(success.AcceptManifest(UpdateRejection::kNone));
+    EXPECT_TRUE(success.BeginDownload());
+    EXPECT_TRUE(success.CompleteDownload(true, true));
+    EXPECT_TRUE(success.PrepareReboot(true));
+    EXPECT_TRUE(success.ObserveFirstBoot());
+    EXPECT_TRUE(success.ConfirmAfterSelfTest(true));
+    EXPECT_EQ(success.Phase(), UpdateAssurancePhase::kConfirmed);
+
+    UpdateAssuranceStateMachine bad_network;
+    EXPECT_TRUE(bad_network.AcceptManifest(UpdateRejection::kNone));
+    EXPECT_TRUE(bad_network.BeginDownload());
+    bad_network.FailDownload(UpdateAssuranceFailure::kNetworkInterrupted);
+    EXPECT_EQ(bad_network.Phase(), UpdateAssurancePhase::kFailed);
+    EXPECT_EQ(bad_network.Failure(), UpdateAssuranceFailure::kNetworkInterrupted);
+
+    UpdateAssuranceStateMachine bad_digest;
+    EXPECT_TRUE(bad_digest.AcceptManifest(UpdateRejection::kNone));
+    EXPECT_TRUE(bad_digest.BeginDownload());
+    EXPECT_TRUE(!bad_digest.CompleteDownload(false, true));
+    EXPECT_EQ(bad_digest.Failure(), UpdateAssuranceFailure::kDigestMismatch);
+
+    UpdateAssuranceStateMachine timeout;
+    EXPECT_TRUE(timeout.AcceptManifest(UpdateRejection::kNone));
+    EXPECT_TRUE(timeout.BeginDownload());
+    EXPECT_TRUE(timeout.CompleteDownload(true, true));
+    EXPECT_TRUE(timeout.PrepareReboot(true));
+    EXPECT_TRUE(timeout.ObserveFirstBoot());
+    timeout.ConfirmationTimedOut();
+    EXPECT_EQ(timeout.Phase(), UpdateAssurancePhase::kRollbackRequested);
+    EXPECT_EQ(timeout.Failure(), UpdateAssuranceFailure::kConfirmationTimedOut);
+}
+
+void TestFailedConfigurationMigrationPreservesCommittedRecording() {
+    const auto root = std::filesystem::temp_directory_path() /
+                      "hi-yaka-config-migration-recording-test";
+    std::error_code error;
+    std::filesystem::remove_all(root, error);
+    test::HostRecordingBackend backend(root);
+    RecordingStore recordings(backend);
+    const uint8_t payload[] = {1, 2, 3, 4};
+    EXPECT_TRUE(recordings.Begin(21));
+    EXPECT_TRUE(recordings.Append(payload, sizeof(payload)));
+    EXPECT_TRUE(recordings.Commit());
+    EXPECT_TRUE(backend.FinalExists(21, false));
+
+    FakeMigrationStore migration_store;
+    migration_store.validate_ok = false;
+    ConfigurationMigrationTransaction migration(migration_store);
+    EXPECT_TRUE(!migration.Run());
+    EXPECT_EQ(migration_store.value, 1);
+    EXPECT_EQ(migration_store.restores, 1U);
+    EXPECT_TRUE(backend.FinalExists(21, false));
+    EXPECT_EQ(backend.FinalSize(21, false), sizeof(payload));
+    std::filesystem::remove_all(root, error);
+}
+
 void TestShutdownIsIdempotent() {
     Fixture fixture;
     Dispatch(fixture.controller, Event(ProductEventType::kShutdownRequested, 50));
@@ -412,6 +566,9 @@ int main() {
     TestNonCriticalCapabilityFailureDoesNotTrapUi();
     TestTimeoutAndExpiredEvents();
     TestUpdateRequiresConfirmation();
+    TestUpdateManifestPolicyRejectsUnsafePackages();
+    TestUpdateStateMachineCoversRecoveryPaths();
+    TestFailedConfigurationMigrationPreservesCommittedRecording();
     TestShutdownIsIdempotent();
 
     if (failures != 0) {

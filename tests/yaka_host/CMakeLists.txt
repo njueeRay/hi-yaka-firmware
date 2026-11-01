@@ -9,6 +9,7 @@ add_executable(hi_yaka_product_core_test
     ../../main/yaka/capability_registry.cc
     ../../main/yaka/product_controller.cc
     ../../main/yaka/recording_store.cc
+    ../../main/yaka/update_assurance.cc
 )
 
 target_include_directories(hi_yaka_product_core_test PRIVATE ../../main/yaka)
