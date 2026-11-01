@@ -13,7 +13,7 @@
 | `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 YaKa 3.0 项目总览与文档导航](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 32 | 顶层唯一入口 |
 | `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 24 | 完整产品 PRD v0.4；OTA 已对齐 MVP Must 与验收矩阵；位于 `01 产品与使用` |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [02 产品规格与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 4 | 位于 `01 产品与使用` |
-| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 64 | PH0–PH5、M1–M7、当前进度与 v1.3 架构评审材料已同步；HiYaKa 无代际后缀命名合同及四页完整图例已回读；位于 `02 硬件与固件研发` |
+| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 71 | PH2 已按 L0 证据关闭，PH3 已设为当前阶段；PR #1、ESP-IDF 6.1 构建和自动化门禁结论已回读；位于 `02 硬件与固件研发` |
 | `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 70 | HiYaKa 板名与内部构建标识已分离，无代际后缀命名及四份硬件命名对齐附件已回读；位于 `02 硬件与固件研发` |
 | `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 12 | 当前接口权威页；Markdown 附件保留在硬件主文档 |
 | `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 12 | HiYaKa 板级事实、无代际后缀命名与板级契约用语已回读；位于 `03 协作、决策与调研` |
@@ -31,6 +31,8 @@
 2026-11-02 完成 HiYaKa 命名合同同步：可读/驼峰形式统一为 `HiYaKa`，全小写短横线形式为 `hi-yaka`，全大写下划线形式为 `HI_YAKA`；板子归属统一写 ChatChat。固件 PRD 更新到 revision 47，硬件主文档更新到 revision 58，协作规范更新到 revision 10；架构图 v1.2 的四页正文图片及 Markdown、draw.io、PDF 附件均已回读。对应私有仓库提交：`25cd393`。
 
 2026-11-02 完成无代际后缀命名复核与架构图语义治理：HiYaKa 自有代码、构建标识、路径、现行文档及架构图不再使用代际后缀；四页架构图均重复完整的七色语义和实线/虚线语义。固件 PRD 更新到 revision 64，硬件主文档更新到 revision 70，协作规范更新到 revision 12；架构图 v1.3 的四页正文图片及 Markdown、draw.io、PDF 附件均已回读；四份硬件审计材料的命名对齐版作为新附件追加，旧附件保留历史追溯。
+
+2026-11-02 完成 PH2 阶段闭环同步：私有仓库 PR #1 已合入 `main`；ESP-IDF 6.1 主目标、host contract、board contract 和 18 个代表性上游板型构建全部通过。飞书固件 PRD 的 PH2 六项 checklist、阶段证据、PH3 状态、当前结论与架构评审状态已局部更新并回读到 revision 71；未覆盖既有图片、附件、评论或历史块。PH2 仅关闭 L0 软件阶段，不据此关闭 M1 或创建产品 Release。
 
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）。
 
