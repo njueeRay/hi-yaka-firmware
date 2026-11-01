@@ -194,7 +194,7 @@ Stage 2 退出条件不是“单次演示成功”，而是每个模块拥有 L2
 - [YaKa 3.0 固件 PRD](../governance/FIRMWARE_PRD.md)
 - [上游同步约定](../../UPSTREAM.md)
 
-飞书协作副本：[06 YaKa 3.0 固件 PRD](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc)。
+飞书协作副本：[01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc)。
 
 ## 3.4 产品数据与使用手册
 
@@ -213,10 +213,12 @@ Stage 2 退出条件不是“单次演示成功”，而是每个模块拥有 L2
 
 制造包必须由唯一冻结版本生成，Gerber/Drill/BOM/CPL、装配图、版本号和哈希必须一致。LCD、电池、扬声器、NFC 天线、TF 和结构件属于外购总装/验证物料，不得误混进贴片 BOM。
 
+2026-11-01 状态纠偏：LED2 极性与 CPL 坐标的工程 `HOLD` 已撤销；当前 EDA 渲染的极性位置、方向和已读取坐标均经人工确认正确。SMT 订单平台曾需要手工 DFM 调整，因此制造结论维持 `CONDITIONAL GO`，最终订单预览、DFM 结果和人工签核仍须作为发布证据保存。
+
 ## 3.6 验证、缺陷与发布
 
 - [证据与事实治理](../governance/EVIDENCE_POLICY.md)
-- [05 验证、缺陷与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf)
+- [01 测试、问题与发布记录](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf)
 
 所有测试记录至少包含时间、操作者、Git SHA、SDK/容器、硬件 revision、样机 SN、步骤、原始日志、产物哈希、期望、实测、结论和复测条件。原始日志只追加，不用总结覆盖原始证据。
 

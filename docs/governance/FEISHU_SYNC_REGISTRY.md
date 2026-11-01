@@ -4,24 +4,26 @@
 > 飞书目录：[YaKa 3.x](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)  
 > 原则：Git Markdown 保存可审计的工程事实源；飞书保存协作副本、跨文档索引和附件入口。
 
+当前飞书目录按用途分为 `01 产品与使用`、`02 硬件与固件研发`、`03 协作、决策与调研`、`04 测试与发布`、`90 制造与发布归档` 和 `99 历史资料（只读）`。旧 `02 工程基线与接口契约` 已废止并移入历史区，当前接口事实以硬件主文档和硬件连接与固件接口表为准。
+
 ## 1. 主文档映射
 
 | 本地事实源/治理对象 | 飞书文档 | Token | Revision | 当前状态 |
 |---|---|---|---:|---|
-| `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 项目首页与版本索引](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 27 | 已索引 09/10 和 Velxio 评估并回读 |
-| 产品需求摘要与状态机 | [01 YaKa 3.x 产品需求与状态机](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 4 | 已追加产品边界并回读 |
-| 硬件/固件接口摘要 | [02 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 18 | 已按 R1.6 附件复核并回读 I²C 契约 |
-| 仓库、上游与技术决策 | [03 版本、决策与变更日志](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 11 | 已记录私有开发/公开快照决策并回读 |
-| 外部资料治理与 `docs/research/VELXIO_SIMULATION_EVALUATION.md` | [04 外部参考与调研库](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 7 | 已登记 Velxio 评估、附件和限时 spike 结论并回读 |
-| `docs/governance/EVIDENCE_POLICY.md` | [05 验证、缺陷与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 4 | 已追加 L0–L3 证据规则并回读 |
-| `docs/governance/FIRMWARE_PRD.md` | [06 YaKa 3.0 固件 PRD](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 8 | 里程碑已改为业务可读的原生 checklist，当前进度、下一步和未决产品输入已回读 |
-| `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [07 YaKa 3.0 产品数据与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 2 | 新建并完成目录回读 |
-| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [08 YaKa 3.0 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 47 | 项目材料已索引 09/10，工作日志已按周归并并登记 PRD checklist，六个权威附件保留并回读 |
-| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [09 YaKa 3.0 硬件模块连接与固件接口契约](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 3 | 新建并完成目录回读；Markdown 附件上传到 08 |
-| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [10 YaKa 3.0 开发协作与文档规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 5 | 新建、Markdown 附件上传并完成目录回读 |
-| 历史仓库与旧资料归档规则 | [99 历史归档索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 6 | 已记录历史/私有/公开三仓库边界并回读 |
+| `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 YaKa 3.0 项目总览与文档导航](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 31 | 顶层唯一入口 |
+| 产品需求摘要与状态机 | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 4 | 位于 `01 产品与使用` |
+| `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [02 产品规格与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 4 | 位于 `01 产品与使用` |
+| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 10 | 位于 `02 硬件与固件研发` |
+| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 52 | 位于 `02 硬件与固件研发` |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 12 | 当前接口权威页；Markdown 附件保留在硬件主文档 |
+| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 7 | 位于 `03 协作、决策与调研` |
+| 仓库、上游与技术决策 | [02 决策与版本记录](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 13 | 位于 `03 协作、决策与调研` |
+| 外部资料治理与 `docs/research/VELXIO_SIMULATION_EVALUATION.md` | [03 外部参考与技术调研](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 7 | 位于 `03 协作、决策与调研` |
+| `docs/governance/EVIDENCE_POLICY.md` | [01 测试、问题与发布记录](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 8 | 位于 `04 测试与发布` |
+| 历史仓库与旧资料归档规则 | [00 历史资料索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 10 | 位于 `99 历史资料（只读）` |
+| 已废止的旧接口摘要 | [90 [已废止] 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 24 | 仅供历史追溯，不得作为当前接口输入 |
 
-本轮主文档、09/10 和 Velxio 评估同步以本登记文件所在 Git 提交为准（2026-10-29）。
+2026-11-01 完成目录分层、文档重命名、旧接口摘要废止及制造状态纠偏；当前映射以本登记文件所在 Git 提交为准。
 
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）。
 
@@ -29,15 +31,15 @@
 
 | 附件 | 目标文档 | SHA-256 | 飞书文件 Token | 状态 |
 |---|---|---|---|---|
-| `docs/yaka/firmware-architecture.md` | 06 固件 PRD | `7d8f7ae0b8880c075e05da9f75afced80deccec991d9a8abca8d1f9a9cc72598` | `QSQRbd2TWo07WPxn4pncxqE0n3f` | 已上传 |
-| `docs/hardware/attachments/yaka-3.0-final-schematic-pcb-reaudit-2026-10-21.md` | 08 硬件主文档 | `d2da46dcd980060614016da17d24c9b153577c8c454f2737622a448693bbd1cb` | `UVG7bcGxEoQl2Lx5rvfcgr8unwh` | 已上传 |
-| `docs/hardware/attachments/yaka-3.0-schematic-audit-and-eco-spec.md` | 08 硬件主文档 | `b6fe1b2f634010054158d67e5f3538f11909c551cf893fda26aad7ff219abcc9` | `KGdgbjotXowmxrxelnoc4Rf7nfb` | 已上传 |
-| `docs/hardware/attachments/yaka-3.0-pcb-comprehensive-audit-and-eco-spec.md` | 08 硬件主文档 | `fe0129892773decae14c210b9e4db0402e42ffb7e46f25444fabb7fbd2378455` | `H5TPb0JwLo9OwxxXPMMcyBnQnLd` | 已上传 |
-| `docs/hardware/attachments/yaka-3.0-prefreeze-release-manufacturing-and-sourcing-checklist.md` | 08 硬件主文档 | `21827082c722903b4b8ac7c6289d42e3f838cc548a14e96d565cc6aa1ca03c90` | `DnyPbFCe9o5hQ7xX1CzcVrBjn5e` | 已上传 |
-| `docs/hardware/attachments/yaka-3.0-procurement-and-consignment-list.csv` | 08 硬件主文档 | `10a8a83fbe50177ba737962a3b2a028e0196384ff88f6b26f9ace4e475a4fc46` | `XeMxbTcEZoqMUuxkN8jcMxHnngz` | 已上传 |
-| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | 08 硬件主文档 | `7054463d187430309db1d0a751759d2e0193af359f53a625600fa16aa07913ea` | `DRy0bQ6dIobLjOx5WO6cVcpsnoc` | 已上传并在 3.2 索引 09 原生文档 |
-| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | 10 开发协作与文档规范 | `2b6970f4a8aa3102a443f5c0fc9b5e0bff8c04b197084d3cfd2f646961ac2d70` | `IaDebP4yBoqK0ux6Mtkc4oqhnUc` | 已上传 |
-| `docs/research/VELXIO_SIMULATION_EVALUATION.md` | 04 外部参考与调研库 | `79614967175b25c04e50eb8ac4707cd07a8cddd52c69d9b52ab81c23b672a986` | `ZsLYbpRNlomJiZx9XVAcJjCUnHe` | 已上传并补充原生摘要 |
+| `docs/yaka/firmware-architecture.md` | 01 固件 PRD 与里程碑 | `7d8f7ae0b8880c075e05da9f75afced80deccec991d9a8abca8d1f9a9cc72598` | `QSQRbd2TWo07WPxn4pncxqE0n3f` | 已上传 |
+| `docs/hardware/attachments/yaka-3.0-final-schematic-pcb-reaudit-2026-10-21.md` | 02 硬件主文档 | `d2da46dcd980060614016da17d24c9b153577c8c454f2737622a448693bbd1cb` | `UVG7bcGxEoQl2Lx5rvfcgr8unwh` | 已上传 |
+| `docs/hardware/attachments/yaka-3.0-schematic-audit-and-eco-spec.md` | 02 硬件主文档 | `b6fe1b2f634010054158d67e5f3538f11909c551cf893fda26aad7ff219abcc9` | `KGdgbjotXowmxrxelnoc4Rf7nfb` | 已上传 |
+| `docs/hardware/attachments/yaka-3.0-pcb-comprehensive-audit-and-eco-spec.md` | 02 硬件主文档 | `fe0129892773decae14c210b9e4db0402e42ffb7e46f25444fabb7fbd2378455` | `H5TPb0JwLo9OwxxXPMMcyBnQnLd` | 已上传 |
+| `docs/hardware/attachments/yaka-3.0-prefreeze-release-manufacturing-and-sourcing-checklist.md` | 02 硬件主文档 | `21827082c722903b4b8ac7c6289d42e3f838cc548a14e96d565cc6aa1ca03c90` | `DnyPbFCe9o5hQ7xX1CzcVrBjn5e` | 已上传 |
+| `docs/hardware/attachments/yaka-3.0-procurement-and-consignment-list.csv` | 02 硬件主文档 | `10a8a83fbe50177ba737962a3b2a028e0196384ff88f6b26f9ace4e475a4fc46` | `XeMxbTcEZoqMUuxkN8jcMxHnngz` | 已上传 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | 02 硬件主文档 | `7054463d187430309db1d0a751759d2e0193af359f53a625600fa16aa07913ea` | `DRy0bQ6dIobLjOx5WO6cVcpsnoc` | 已上传并在 3.2 索引 03 原生文档 |
+| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | 01 开发协作与文档维护规范 | `2b6970f4a8aa3102a443f5c0fc9b5e0bff8c04b197084d3cfd2f646961ac2d70` | `IaDebP4yBoqK0ux6Mtkc4oqhnUc` | 已上传 |
+| `docs/research/VELXIO_SIMULATION_EVALUATION.md` | 03 外部参考与技术调研 | `79614967175b25c04e50eb8ac4707cd07a8cddd52c69d9b52ab81c23b672a986` | `ZsLYbpRNlomJiZx9XVAcJjCUnHe` | 已上传并补充原生摘要 |
 
 ## 3. 同步与冲突规则
 
