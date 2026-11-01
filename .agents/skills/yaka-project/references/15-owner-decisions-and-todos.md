@@ -5,7 +5,7 @@
 处理“当前由谁负责”“还有哪些需要 Owner 回答”“某项是否已经决定”“哪些只是工程执行”时，读取：
 
 - 本地当前台账：[yaka-3.0-owner-decisions-and-todos.md](yaka-3.0-owner-decisions-and-todos.md)
-- 飞书协作副本：`YaKa 3.x / 03 协作、决策与调研 / 当前角色、Owner 决策与待办`
+- 飞书协作副本：`HiYaKa / 03 协作、决策与调研 / 当前角色、Owner 决策与待办`
 - 正式历史决定：飞书 `02 决策与版本记录`
 
 ## 职责边界
