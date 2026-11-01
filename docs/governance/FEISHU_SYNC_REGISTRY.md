@@ -1,6 +1,6 @@
 # YaKa 飞书文档同步登记
 
-> 最后更新：2026-11-01
+> 最后更新：2026-11-02
 > 飞书目录：[YaKa 3.x](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)  
 > 原则：Git Markdown 保存可审计的工程事实源；飞书保存协作副本、跨文档索引和附件入口。
 
@@ -11,9 +11,9 @@
 | 本地事实源/治理对象 | 飞书文档 | Token | Revision | 当前状态 |
 |---|---|---|---:|---|
 | `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 YaKa 3.0 项目总览与文档导航](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 32 | 顶层唯一入口 |
-| `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 12 | 完整产品 PRD v0.4；位于 `01 产品与使用` |
+| `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 24 | 完整产品 PRD v0.4；OTA 已对齐 MVP Must 与验收矩阵；位于 `01 产品与使用` |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [02 产品规格与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 4 | 位于 `01 产品与使用` |
-| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 10 | 位于 `02 硬件与固件研发` |
+| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 29 | PH0–PH5、M1–M7、当前进度与 v1.1 架构评审材料已同步；位于 `02 硬件与固件研发` |
 | `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 52 | 位于 `02 硬件与固件研发` |
 | `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 12 | 当前接口权威页；Markdown 附件保留在硬件主文档 |
 | `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 8 | 位于 `03 协作、决策与调研` |
@@ -26,13 +26,22 @@
 
 2026-11-01 完成目录分层、文档重命名、旧接口摘要废止及制造状态纠偏；当前映射以本登记文件所在 Git 提交为准。
 
+2026-11-02 使用 `lark-cli` 完成产品 PRD 与固件 PRD 的章节级同步和回读：产品 PRD revision 24，固件 PRD revision 29。同步过程未全文覆盖云文档，保留既有图片、评论和历史块；架构材料采用新版本文件名追加，未静默替换旧附件。
+
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）。
 
 ## 2. 附件登记
 
 | 附件 | 目标文档 | SHA-256 | 飞书文件 Token | 状态 |
 |---|---|---|---|---|
-| `docs/yaka/firmware-architecture.md` | 01 固件 PRD 与里程碑 | `7d8f7ae0b8880c075e05da9f75afced80deccec991d9a8abca8d1f9a9cc72598` | `QSQRbd2TWo07WPxn4pncxqE0n3f` | 已上传 |
+| `docs/yaka/firmware-architecture.md`（历史 v1.0） | 01 固件 PRD 与里程碑 | `7d8f7ae0b8880c075e05da9f75afced80deccec991d9a8abca8d1f9a9cc72598` | `QSQRbd2TWo07WPxn4pncxqE0n3f` | 历史附件，保留追溯 |
+| `docs/yaka/firmware-architecture.md`（v1.1） | 01 固件 PRD 与里程碑 | `c58d8b1a469a3eb2762a11f0005f3a7f2dada1a8395ef34031d99ba758222ead` | `KiMMbiCSaoMr7HxyYYbcEFx7nv0` | 2026-11-02 已上传并回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture.drawio`（v1.1 编辑源） | 01 固件 PRD 与里程碑 | `5b8e078c62cd60f4d876b36394b5a2e47bd013be86612f7fa2d4ad780f70c2f5` | `JmDSb87W0osq7fxP4d2cTnDqnjg` | 2026-11-02 已上传并回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture.drawio.pdf`（v1.1 四页） | 01 固件 PRD 与里程碑 | `6e8a382820079c0525d4175fb4c7d941a53661eccbb317fdd2363272bf0594ec` | `M35PbyWWloF9Jbxja5Vcv1ZlnJe` | 2026-11-02 已上传并回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture.drawio.png`（第 1 页） | 01 固件 PRD 与里程碑 | `ede5e24d0156b6406090c76fe2abc5d839f6f58f0bd2d32d64b3304d69d0891f` | `MCkbbCJevoa8pQx4nLEcp9TxnCe` | 已插入正文并回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-page-2.drawio.png` | 01 固件 PRD 与里程碑 | `a373edc30857a1847dfd2b4f0b414a94be7bf3c41a620e6dec853fec689e9052` | `VYmLbDms8ohJNMxGC3ZcjBdZnpg` | 已插入正文并回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-page-3.drawio.png` | 01 固件 PRD 与里程碑 | `85ae3fae57387cfbc2e978d1a40d1358728d2442c8073e3bf9c1f3d602884836` | `VQJbb5zFJoorsHxllyqc05ofnuh` | 已插入正文并回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-page-4.drawio.png` | 01 固件 PRD 与里程碑 | `d0fab37b8f152be60e3444e7b0088fb3d9e6aa05ec125a6755d6a8dfea899091` | `HDKQbQJizoNRFlxGT9BcZUK5nbd` | 已插入正文并回读 |
 | `docs/hardware/attachments/yaka-3.0-final-schematic-pcb-reaudit-2026-10-21.md` | 02 硬件主文档 | `d2da46dcd980060614016da17d24c9b153577c8c454f2737622a448693bbd1cb` | `UVG7bcGxEoQl2Lx5rvfcgr8unwh` | 已上传 |
 | `docs/hardware/attachments/yaka-3.0-schematic-audit-and-eco-spec.md` | 02 硬件主文档 | `b6fe1b2f634010054158d67e5f3538f11909c551cf893fda26aad7ff219abcc9` | `KGdgbjotXowmxrxelnoc4Rf7nfb` | 已上传 |
 | `docs/hardware/attachments/yaka-3.0-pcb-comprehensive-audit-and-eco-spec.md` | 02 硬件主文档 | `fe0129892773decae14c210b9e4db0402e42ffb7e46f25444fabb7fbd2378455` | `H5TPb0JwLo9OwxxXPMMcyBnQnLd` | 已上传 |
