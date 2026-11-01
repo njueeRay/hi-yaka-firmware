@@ -1,7 +1,7 @@
 # YaKa 3.0 固件总体架构与开发基线
 
-> 文档状态：`评审基线 v1.1`
-> 最近更新：2026-11-01
+> 文档状态：`评审基线 v1.2`
+> 最近更新：2026-11-02
 > 适用硬件：YaKa 3.0 / ESP32-C6  
 > 适用软件基线：`xiaozhi-esp32 v2.5.2`、ESP-IDF `v6.1`  
 > 当前实现阶段：PH0/PH1 已完成；PH2 架构评审中；实板 M1 尚未开始
@@ -34,7 +34,15 @@ PRD 与硬件审计原文保存在 YaKa 项目资料区，不复制进固件仓�
 | 3 | 音频、录音、UI 与 OTA 数据流 | 数据经过哪些现存模块，YaKa 应在哪个接缝扩展 | [PNG](diagrams/yaka-firmware-architecture-page-3.drawio.png) |
 | 4 | 构建、上游、CI 与文档同步 | 板型如何被构建、上游如何合并、证据和文档如何闭环 | [PNG](diagrams/yaka-firmware-architecture-page-4.drawio.png) |
 
-多页审阅和归档使用[可检索 PDF](diagrams/yaka-firmware-architecture.drawio.pdf)。`.drawio` 是唯一图形编辑源；PNG/PDF 是同一源文件的导出物，不能分别修改。
+多页审阅和归档使用[可检索 PDF（v1.2）](diagrams/yaka-firmware-architecture-v1.2.pdf)。`.drawio` 是唯一图形编辑源；PNG/PDF 是同一源文件的导出物，不能分别修改。旧版 `yaka-firmware-architecture.drawio.pdf` 仅作为 v1.1 历史导出保留。
+
+### 0.3 HiYaKa 命名合同
+
+- 板子的对外名称和架构语义名称统一为 **HiYaKa**，所属组织为 **ChatChat**；需要表达归属时写“ChatChat HiYaKa”。
+- 新标识按表示法固定：可读/驼峰形式为 `HiYaKa`，全小写短横线形式为 `hi-yaka`，全大写下划线形式为 `HI_YAKA`；不再派生其他拼法。
+- `YaKa 3.0` 描述当前产品版本，不把它缩写或转写为板名“V3”。
+- 既有 `chatchat/hi-yaka-v3`、`HiYakaV3Board`、`BOARD_TYPE_HI_YAKA_V3` 和 `hi_yaka_v3_board.cc` 仅作为旧内部兼容标识保留。本文只有在精确追踪目录、类、宏或文件时才以代码格式引用，并不把它们用作板名或新命名模板。
+- 是否迁移这些既有实现标识属于后续独立代码变更；本架构评审不因统一语义而改动构建链。
 
 ## 1. 项目理解
 
@@ -126,8 +134,8 @@ PCA9557 上电必须先写 Output Port=`0x40`，再写 Configuration=`0x38`，�
 | 音频管线 | `main/audio/audio_service.*`、`audio_processor/lite_audio_processor.*`、`audio_codec.*` | 已有固定容量音频队列、输入/输出/Opus 任务；C6 使用 LiteAudioEngine，无设备端 AEC | 接入真实 ES7210/ES8311 与非阻塞录音分流；保留 I²S RX 单一所有者 |
 | 云端协议 | `main/protocols/protocol.*`、`mqtt_protocol.*`、`websocket_protocol.*` | 已有会话建立、音频包和 JSON 消息通道 | `XiaozhiAdapter` 只做产品事件/命令映射，不重写协议 |
 | 通用板抽象 | `main/boards/common/board.*`、`wifi_board.*` | `Board`/`WifiBoard` 提供 Display、Led、AudioCodec、Network 等抽象和 Wi-Fi 生命周期 | YaKa board 继续继承，不绕过抽象从业务层访问 GPIO |
-| YaKa 板级 | `main/boards/chatchat/hi-yaka-v3/hi_yaka_v3_board.cc`、`config.h`、`config.json` | 只有 M1：启动诊断、I²C0 GPIO10/11、PCA9557 安全态与五地址探测；仍返回 `DummyAudioCodec`、`NoDisplay`、`NoLed` | 逐阶段替换真实驱动，并把每项结果汇总为 capability health |
-| 板型选择 | `main/Kconfig.projbuild`、`main/CMakeLists.txt`、`main/boards/.../config.json` | `BOARD_TYPE_HI_YAKA_V3` → board 目录 → `DECLARE_BOARD(HiYakaV3Board)` 的单一工厂链已成立 | 保持每个固件只有一个 board factory |
+| ChatChat HiYaKa 板级 | 旧内部路径 `main/boards/chatchat/hi-yaka-v3/hi_yaka_v3_board.cc`、`config.h`、`config.json` | 只有 M1：启动诊断、I²C0 GPIO10/11、PCA9557 安全态与五地址探测；仍返回 `DummyAudioCodec`、`NoDisplay`、`NoLed` | 逐阶段替换真实驱动，并把每项结果汇总为 capability health |
+| 板型选择 | `main/Kconfig.projbuild`、`main/CMakeLists.txt`、`main/boards/.../config.json` | 旧内部标识链 `BOARD_TYPE_HI_YAKA_V3` → board 目录 → `DECLARE_BOARD(HiYakaV3Board)` 已成立 | 保持每个固件只有一个 board factory；对外统一称 HiYaKa |
 | Flash/OTA | `partitions/v2/16m_c3.csv`、`main/ota.*`、`main/settings.*`、`main/assets.*` | 双 OTA 与资源分区、OTA transport 和配置基础已存在 | 增加用户确认、低电量/录音互斥、启动自检、确认与回滚策略 |
 | UI/反馈 | 通用 `display/`、`led/`、`notify_player.*`；YaKa 当前为 `NoDisplay`/`NoLed` | 上游基础设施可复用，但没有 YaKa 200×320 页面、实体键焦点、RGB/振动语义 | 计划 `main/yaka/feedback_service.*` 与 YaKa display/driver 接入 |
 | 本地录音/文件 | 当前无 YaKa 实现 | 没有 recorder、可靠 `.part` 提交、TF 恢复和产品文件索引 | 计划 `main/yaka/recorder_service.*`、`storage_service.*`、capture adapter |
@@ -155,7 +163,7 @@ flowchart TD
 
 ### 5.1 板级与驱动层
 
-目录以 `main/boards/chatchat/hi-yaka-v3` 为唯一硬件真值入口，负责：
+ChatChat HiYaKa 当前以旧内部兼容目录 `main/boards/chatchat/hi-yaka-v3` 作为唯一硬件真值入口，负责：
 
 - pin、总线、地址、外设构造和上电安全态；
 - I²C 总线恢复、PCA9557、LCD、按键、TF、音频、NFC、IMU、RGB、振动、电池 ADC；
@@ -275,7 +283,7 @@ M1 的 16 MiB 分区结果为：NVS 16 KiB、OTA data 8 KiB、两个 4032 KiB ap
 - `feature/*`：YaKa 功能；
 - `sync/xiaozhi-vX.Y.Z`：只做上游版本升级和冲突处理。
 
-产品开发固定在明确的小智 release/tag 上，不追随上游 `main`。上游升级使用独立 PR 和 merge commit；功能 PR 默认 squash。同步 PR 不混入新产品功能，并至少构建 YaKa C6 板型和一个上游 C6 代表板型。详细流程见仓库根目录 `UPSTREAM.md`。
+产品开发固定在明确的小智 release/tag 上，不追随上游 `main`。上游升级使用独立 PR 和 merge commit；功能 PR 默认 squash。同步 PR 不混入新产品功能，并至少构建 HiYaKa C6 板型和一个上游 C6 代表板型。详细流程见仓库根目录 `UPSTREAM.md`。
 
 Raynode 正式工作区为 `/srv/projects/hi-yaka-firmware`，使用固定 `espressif/idf:v6.1` 镜像。仓库级 deploy key 允许该服务器直接拉取和推送本仓库，但不授予账户其他仓库权限。
 

@@ -16,6 +16,14 @@ description: 维护 YaKa 3.0 的产品、硬件、固件、验证证据及飞书
 - 验证、日志、缺陷、资源预算、发布结论：读 [40-validation-and-evidence.md](references/40-validation-and-evidence.md)。
 - 修改本地/飞书文档、附件或同步登记：读 [50-document-sync.md](references/50-document-sync.md)。
 
+## 命名合同
+
+1. 板子的对外名称和语义名称统一为 `HiYaKa`，归属组织为 `ChatChat`；需要同时表达归属时写“ChatChat HiYaKa”，不要写“HiYaKa V3”“HiYaka”“Hi YaKa V3”或把 `V3` 当成板名后缀。
+2. `YaKa 3.0` 是当前产品版本语义，不等于板子名“V3”。产品、架构、测试、发布和用户文案都遵守此区分。
+3. 新命名按表示法固定：可读/驼峰形式用 `HiYaKa`；全小写短横线形式用 `hi-yaka`；全大写下划线形式用 `HI_YAKA`。不得自行派生 `HiYaka`、`Hi-Yaka`、`HIYAKA` 等变体。
+4. 现有 `chatchat/hi-yaka-v3`、`hi-yaka-v3`、`HiYakaV3Board`、`BOARD_TYPE_HI_YAKA_V3` 和 `hi_yaka_v3_board.cc` 只属于当前内部实现标识。只有在精确引用构建参数、目录、文件、类或宏时才以代码格式原样出现，并标明“旧内部兼容标识”；不得把它们传播成新的产品名、板名、标题或用户可见字符串。
+5. 重命名既有实现标识属于单独的代码迁移，必须同时评估构建选择链、CI、产物命名、上游同步和兼容性；文档口径治理不得顺手改代码标识。
+
 ## 不可破坏的边界
 
 1. 活体 EDA 和封存复审决定硬件事实；批准版 PRD 决定产品行为；代码和旧文档不能反向覆盖二者。

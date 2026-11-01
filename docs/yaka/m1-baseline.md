@@ -11,8 +11,9 @@
 | ESP-IDF | `v6.1` |
 | 构建镜像 | `espressif/idf:v6.1@sha256:81893c71bb5e570088901f21def8684c25cd2a9020281bd01b843a7655edb18c` |
 | target | `esp32c6` |
-| board type/name | `hi-yaka-v3` |
-| manufacturer | `chatchat` |
+| 对外/语义板名 | `HiYaKa` |
+| 所属组织 | `ChatChat` |
+| 当前内部 board/build ID | `chatchat/hi-yaka-v3` / `hi-yaka-v3` |
 | Flash | 16 MiB，M1 使用 DIO |
 | PSRAM | 不支持、禁用 |
 
@@ -21,7 +22,7 @@
 M1 只建立正式固件仓库和可运行的板级最小入口：
 
 1. 固定上游和 ESP-IDF 版本；
-2. 建立唯一 YaKa 板型与构建选择链；
+2. 建立唯一 HiYaKa 板型与构建选择链；
 3. 输出复位原因、Flash ID/容量和内部堆信息；
 4. 初始化共享 I2C 并探测五个固定地址；
 5. 按“先安全值、后输出方向”的顺序初始化 PCA9557；
