@@ -1,7 +1,7 @@
 # YaKa 3.0 硬件设计与研发主文档
 
 > 文档角色：YaKa 3.0 项目操作台、阶段规划、跨域技术链路、材料索引与工作日志<br>
-> 当前硬件基线：YaKa v3.0，封存复审 R1.6（2026-10-21）<br>
+> 当前硬件基线：YaKa 3.0，封存复审 R1.6（2026-10-21）<br>
 > 当前研发阶段：Stage 1 / M1 软件基线完成，等待首板 L1 bring-up<br>
 > 最近更新：2026-10-29
 
@@ -31,7 +31,7 @@ YaKa 3.0 的目标不是“让一块 ESP32-C6 板跑起来”，而是形成一�
 
 - 小智 `v2.5.2` / `49b4380` 固定为首个上游基线；
 - ESP-IDF 6.1 开发环境和 Raynode 远程构建基线建立；
-- ChatChat HiYaKa 板型、ESP32-C6、DIO、16 MiB Flash、无 PSRAM 编译策略建立；当前内部构建标识为 `chatchat/hi-yaka-v3`；
+- ChatChat HiYaKa 板型、ESP32-C6、DIO、16 MiB Flash、无 PSRAM 编译策略建立；构建标识为 `chatchat/hi-yaka`；
 - M1 完整构建和 7 项聚焦测试通过，属于 L0 软件证据；
 - R1.6 原理图/PCB全链路复审完成，结论为 `GO TO PROTOTYPE`；制造发布保持 `CONDITIONAL GO`。
 
@@ -98,8 +98,8 @@ Stage 2 退出条件不是“单次演示成功”，而是每个模块拥有 L2
 
 ## 2.1 当前版本与工程原则
 
-- **硬件基线：**YaKa v3.0 / R1.6；原理图和 PCB 可以进入打样，制造文件仍需最终签核。
-- **固件基线：**`hi-yaka-firmware`，小智 `v2.5.2`，ESP-IDF 6.1，对外板名为 ChatChat HiYaKa；当前内部构建标识为 `chatchat/hi-yaka-v3`。
+- **硬件基线：**YaKa 3.0 / R1.6；原理图和 PCB 可以进入打样，制造文件仍需最终签核。
+- **固件基线：**`hi-yaka-firmware`，小智 `v2.5.2`，ESP-IDF 6.1，对外板名为 ChatChat HiYaKa；构建标识为 `chatchat/hi-yaka`。
 - **资源原则：**ESP32-C6 无 PSRAM；所有队列、音频缓冲、显示缓冲和文件写入必须有界并可测。
 - **上游原则：**小智提供平台能力，不定义 YaKa 产品行为；产品差异收敛在 board、适配层和领域服务。
 - **数据原则：**I²S RX 只有一个所有者，本地录音在采集适配层分流；TF 写入不能阻塞音频实时路径。

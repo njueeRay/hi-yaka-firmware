@@ -1,5 +1,5 @@
-#ifndef _HI_YAKA_V3_CONFIG_H_
-#define _HI_YAKA_V3_CONFIG_H_
+#ifndef _HI_YAKA_CONFIG_H_
+#define _HI_YAKA_CONFIG_H_
 
 #include <driver/gpio.h>
 #include <driver/i2c_types.h>
@@ -29,4 +29,4 @@
 #define YAKA_PCA9557_SAFE_OUTPUT 0x40
 #define YAKA_PCA9557_SAFE_CONFIGURATION 0x38
 
-#endif  // _HI_YAKA_V3_CONFIG_H_
+#endif  // _HI_YAKA_CONFIG_H_

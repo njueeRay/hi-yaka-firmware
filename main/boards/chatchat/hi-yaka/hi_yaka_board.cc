@@ -14,14 +14,14 @@
 #include <esp_system.h>
 #include <sdkconfig.h>
 
-#define TAG "HiYakaV3"
+#define TAG "HiYaKa"
 
 #if !defined(CONFIG_IDF_TARGET_ESP32C6) || !CONFIG_IDF_TARGET_ESP32C6
-#error "hi-yaka-v3 is defined only for ESP32-C6"
+#error "hi-yaka is defined only for ESP32-C6"
 #endif
 
 #if defined(CONFIG_SPIRAM) && CONFIG_SPIRAM
-#error "ESP32-C6 does not support external PSRAM; hi-yaka-v3 must remain a no-PSRAM build"
+#error "ESP32-C6 does not support external PSRAM; hi-yaka must remain a no-PSRAM build"
 #endif
 
 namespace {
@@ -44,7 +44,7 @@ constexpr std::array<ExpectedI2cDevice, 5> kExpectedI2cDevices = {{
 
 }  // namespace
 
-class HiYakaV3Board : public WifiBoard {
+class HiYaKaBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t i2c_bus_ = nullptr;
     i2c_master_dev_handle_t pca9557_ = nullptr;
@@ -55,7 +55,7 @@ private:
         esp_err_t id_result = esp_flash_read_id(nullptr, &flash_id);
         esp_err_t size_result = esp_flash_get_size(nullptr, &flash_size);
 
-        ESP_LOGI(TAG, "M1 board=hi-yaka-v3 target=esp32c6 psram=unsupported");
+        ESP_LOGI(TAG, "M1 board=hi-yaka target=esp32c6 psram=unsupported");
         ESP_LOGI(TAG, "Reset reason=%d", static_cast<int>(esp_reset_reason()));
         if (id_result == ESP_OK && size_result == ESP_OK) {
             ESP_LOGI(TAG, "Flash id=0x%08" PRIx32 " size=%" PRIu32 " bytes", flash_id,
@@ -159,7 +159,7 @@ private:
     }
 
 public:
-    HiYakaV3Board() {
+    HiYaKaBoard() {
         LogPlatformBaseline();
         InitializeI2c();
         InitializePca9557SafeState();
@@ -173,4 +173,4 @@ public:
     }
 };
 
-DECLARE_BOARD(HiYakaV3Board);
+DECLARE_BOARD(HiYaKaBoard);

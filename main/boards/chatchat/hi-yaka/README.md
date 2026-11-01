@@ -2,7 +2,7 @@
 
 状态：`M1 最小板级基线`。本目录不是完整产品固件，也不代表实板外设已经通过。
 
-命名说明：板子的对外名称统一为 HiYaKa，所属组织为 ChatChat；全小写短横线形式用 `hi-yaka`，全大写下划线形式用 `HI_YAKA`。目录 `chatchat/hi-yaka-v3` 和构建参数 `hi-yaka-v3` 是旧内部兼容标识，不是板子的对外名称。
+命名说明：板子的对外名称统一为 HiYaKa，所属组织为 ChatChat；全小写短横线形式用 `hi-yaka`，全大写下划线形式用 `HI_YAKA`。
 
 ## M1 已接入
 
@@ -41,8 +41,8 @@
 ## 构建
 
 ```bash
-python3 scripts/build.py chatchat/hi-yaka-v3 \
-  --name hi-yaka-v3 \
+python3 scripts/build.py chatchat/hi-yaka \
+  --name hi-yaka \
   --language zh-CN \
   --wake-word disabled
 ```

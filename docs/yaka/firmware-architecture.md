@@ -1,6 +1,6 @@
 # YaKa 3.0 固件总体架构与开发基线
 
-> 文档状态：`评审基线 v1.2`
+> 文档状态：`评审基线 v1.3`
 > 最近更新：2026-11-02
 > 适用硬件：YaKa 3.0 / ESP32-C6  
 > 适用软件基线：`xiaozhi-esp32 v2.5.2`、ESP-IDF `v6.1`  
@@ -16,7 +16,7 @@
 |---|---|---|
 | YaKa 3.0 产品需求文档 | `v0.4`，2026-10-30，当前协作基线 | 定义产品目标、范围、交互与验收；未批准项继续保留 `候选/TBD` |
 | YaKa 3.0 封存前原理图、PCB 与 PRD 全链路复审 | `R1.6`，2026-10-21 | 当前硬件事实、能力边界、引脚/总线/器件和 EVT 风险的主要依据 |
-| EasyEDA Pro 活体工程 | YaKa v3.0，复审记录中的工程 UUID | 原理图或 PCB 变更后优先于本文；变更必须重新同步固件硬件契约 |
+| EasyEDA Pro 活体工程 | YaKa 3.0，复审记录中的工程 UUID | 原理图或 PCB 变更后优先于本文；变更必须重新同步固件硬件契约 |
 | xiaozhi-esp32 | tag `v2.5.2`，commit `49b4380` | 当前软件脚手架和可复用能力的精确基线，不代表永久追随上游 `main` |
 | ESP-IDF | 官方 `v6.1` 镜像 | 编译器、组件、C6 target 和构建行为基线 |
 | 历史 `yaka-firmware` 与旧架构材料 | 只作线索 | 不作为编译环境、驱动接口、引脚或功能状态的权威来源 |
@@ -34,15 +34,33 @@ PRD 与硬件审计原文保存在 YaKa 项目资料区，不复制进固件仓�
 | 3 | 音频、录音、UI 与 OTA 数据流 | 数据经过哪些现存模块，YaKa 应在哪个接缝扩展 | [PNG](diagrams/yaka-firmware-architecture-page-3.drawio.png) |
 | 4 | 构建、上游、CI 与文档同步 | 板型如何被构建、上游如何合并、证据和文档如何闭环 | [PNG](diagrams/yaka-firmware-architecture-page-4.drawio.png) |
 
-多页审阅和归档使用[可检索 PDF（v1.2）](diagrams/yaka-firmware-architecture-v1.2.pdf)。`.drawio` 是唯一图形编辑源；PNG/PDF 是同一源文件的导出物，不能分别修改。旧版 `yaka-firmware-architecture.drawio.pdf` 仅作为 v1.1 历史导出保留。
+多页审阅和归档使用[可检索 PDF（v1.3）](diagrams/yaka-firmware-architecture-v1.3.pdf)。`.drawio` 是唯一图形编辑源；PNG/PDF 是同一源文件的导出物，不能分别修改。旧版 PDF 只作历史导出保留。
 
 ### 0.3 HiYaKa 命名合同
 
 - 板子的对外名称和架构语义名称统一为 **HiYaKa**，所属组织为 **ChatChat**；需要表达归属时写“ChatChat HiYaKa”。
 - 新标识按表示法固定：可读/驼峰形式为 `HiYaKa`，全小写短横线形式为 `hi-yaka`，全大写下划线形式为 `HI_YAKA`；不再派生其他拼法。
-- `YaKa 3.0` 描述当前产品版本，不把它缩写或转写为板名“V3”。
-- 既有 `chatchat/hi-yaka-v3`、`HiYakaV3Board`、`BOARD_TYPE_HI_YAKA_V3` 和 `hi_yaka_v3_board.cc` 仅作为旧内部兼容标识保留。本文只有在精确追踪目录、类、宏或文件时才以代码格式引用，并不把它们用作板名或新命名模板。
-- 是否迁移这些既有实现标识属于后续独立代码变更；本架构评审不因统一语义而改动构建链。
+- `YaKa 3.0` 描述当前产品版本，不转写为板名后缀。
+- 目录和 build ID 使用 `chatchat/hi-yaka` / `hi-yaka`，类名使用 `HiYaKaBoard`，宏使用 `BOARD_TYPE_HI_YAKA`，文件名使用 `hi_yaka_board.cc`。
+- 文档、架构图、日志、测试、CI 和构建链必须引用同一组标识，不保留带代际后缀的兼容别名。
+
+### 0.4 架构图颜色与线型合同
+
+四页架构图使用完全相同的视觉语义。颜色只表示对象角色，线型只表示关系或实现状态，不得按页面临时改义。
+
+| 视觉样式 | 统一语义 |
+|---|---|
+| 蓝色 | 当前复用的小智或上游现有实现 |
+| 绿色 | HiYaKa 仓库内已经存在的本地实现或事实源 |
+| 橙色虚线框 | 尚待批准或尚待实现的目标组件 |
+| 黄色 | 已确认的合同、配置、调度机制、中间过程或可追溯产物 |
+| 紫色 | 云端、外部系统、公开发布目标或协作副本等边界外对象 |
+| 灰色 | 物理器件、用户端点、运行上下文或仅用于分组的容器 |
+| 红色 | 约束、风险、验证门禁、证据要求或禁止事项 |
+| 实线连接 | 当前存在或已经确认的关系 |
+| 虚线连接 | 计划关系、待实现接缝或尚未取得实板证据的路径 |
+
+每一页底部都重复显示完整图例。判断节点状态时必须同时读取颜色和线型，不能只凭颜色推断“已完成”。
 
 ## 1. 项目理解
 
@@ -134,8 +152,8 @@ PCA9557 上电必须先写 Output Port=`0x40`，再写 Configuration=`0x38`，�
 | 音频管线 | `main/audio/audio_service.*`、`audio_processor/lite_audio_processor.*`、`audio_codec.*` | 已有固定容量音频队列、输入/输出/Opus 任务；C6 使用 LiteAudioEngine，无设备端 AEC | 接入真实 ES7210/ES8311 与非阻塞录音分流；保留 I²S RX 单一所有者 |
 | 云端协议 | `main/protocols/protocol.*`、`mqtt_protocol.*`、`websocket_protocol.*` | 已有会话建立、音频包和 JSON 消息通道 | `XiaozhiAdapter` 只做产品事件/命令映射，不重写协议 |
 | 通用板抽象 | `main/boards/common/board.*`、`wifi_board.*` | `Board`/`WifiBoard` 提供 Display、Led、AudioCodec、Network 等抽象和 Wi-Fi 生命周期 | YaKa board 继续继承，不绕过抽象从业务层访问 GPIO |
-| ChatChat HiYaKa 板级 | 旧内部路径 `main/boards/chatchat/hi-yaka-v3/hi_yaka_v3_board.cc`、`config.h`、`config.json` | 只有 M1：启动诊断、I²C0 GPIO10/11、PCA9557 安全态与五地址探测；仍返回 `DummyAudioCodec`、`NoDisplay`、`NoLed` | 逐阶段替换真实驱动，并把每项结果汇总为 capability health |
-| 板型选择 | `main/Kconfig.projbuild`、`main/CMakeLists.txt`、`main/boards/.../config.json` | 旧内部标识链 `BOARD_TYPE_HI_YAKA_V3` → board 目录 → `DECLARE_BOARD(HiYakaV3Board)` 已成立 | 保持每个固件只有一个 board factory；对外统一称 HiYaKa |
+| ChatChat HiYaKa 板级 | `main/boards/chatchat/hi-yaka/hi_yaka_board.cc`、`config.h`、`config.json` | 只有 M1：启动诊断、I²C0 GPIO10/11、PCA9557 安全态与五地址探测；仍返回 `DummyAudioCodec`、`NoDisplay`、`NoLed` | 逐阶段替换真实驱动，并把每项结果汇总为 capability health |
+| 板型选择 | `main/Kconfig.projbuild`、`main/CMakeLists.txt`、`main/boards/.../config.json` | `BOARD_TYPE_HI_YAKA` → board 目录 → `DECLARE_BOARD(HiYaKaBoard)` 已成立 | 保持每个固件只有一个 board factory；对外统一称 HiYaKa |
 | Flash/OTA | `partitions/v2/16m_c3.csv`、`main/ota.*`、`main/settings.*`、`main/assets.*` | 双 OTA 与资源分区、OTA transport 和配置基础已存在 | 增加用户确认、低电量/录音互斥、启动自检、确认与回滚策略 |
 | UI/反馈 | 通用 `display/`、`led/`、`notify_player.*`；YaKa 当前为 `NoDisplay`/`NoLed` | 上游基础设施可复用，但没有 YaKa 200×320 页面、实体键焦点、RGB/振动语义 | 计划 `main/yaka/feedback_service.*` 与 YaKa display/driver 接入 |
 | 本地录音/文件 | 当前无 YaKa 实现 | 没有 recorder、可靠 `.part` 提交、TF 恢复和产品文件索引 | 计划 `main/yaka/recorder_service.*`、`storage_service.*`、capture adapter |
@@ -163,7 +181,7 @@ flowchart TD
 
 ### 5.1 板级与驱动层
 
-ChatChat HiYaKa 当前以旧内部兼容目录 `main/boards/chatchat/hi-yaka-v3` 作为唯一硬件真值入口，负责：
+ChatChat HiYaKa 以目录 `main/boards/chatchat/hi-yaka` 作为唯一硬件真值入口，负责：
 
 - pin、总线、地址、外设构造和上电安全态；
 - I²C 总线恢复、PCA9557、LCD、按键、TF、音频、NFC、IMU、RGB、振动、电池 ADC；

@@ -5,18 +5,18 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BOARD_DIR = ROOT / "main" / "boards" / "chatchat" / "hi-yaka-v3"
+BOARD_DIR = ROOT / "main" / "boards" / "chatchat" / "hi-yaka"
 
 
-class HiYakaBoardContractTest(unittest.TestCase):
+class HiYaKaBoardContractTest(unittest.TestCase):
     def test_board_identity_and_no_psram_policy(self):
         config = json.loads((BOARD_DIR / "config.json").read_text(encoding="utf-8"))
         self.assertEqual(config["manufacturer"], "chatchat")
-        self.assertEqual(config["type"], "hi-yaka-v3")
+        self.assertEqual(config["type"], "hi-yaka")
         self.assertEqual(config["target"], "esp32c6")
         self.assertEqual(len(config["builds"]), 1)
         build = config["builds"][0]
-        self.assertEqual(build["name"], "hi-yaka-v3")
+        self.assertEqual(build["name"], "hi-yaka")
         options = set(build["sdkconfig_append"])
         self.assertFalse(any(option.startswith("CONFIG_SPIRAM=") for option in options))
         self.assertIn("CONFIG_ESPTOOLPY_FLASHMODE_DIO=y", options)
@@ -26,10 +26,10 @@ class HiYakaBoardContractTest(unittest.TestCase):
     def test_build_selection_chain_is_complete(self):
         kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
         cmake = (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
-        self.assertRegex(kconfig, r"config BOARD_TYPE_HI_YAKA_V3\s+bool")
+        self.assertRegex(kconfig, r"config BOARD_TYPE_HI_YAKA\s+bool")
         self.assertIn("depends on IDF_TARGET_ESP32C6", kconfig)
-        self.assertIn("CONFIG_BOARD_TYPE_HI_YAKA_V3", cmake)
-        self.assertIn('set(BOARD_DIR "chatchat/hi-yaka-v3")', cmake)
+        self.assertIn("CONFIG_BOARD_TYPE_HI_YAKA", cmake)
+        self.assertIn('set(BOARD_DIR "chatchat/hi-yaka")', cmake)
 
     def test_hardware_contract_constants(self):
         header = (BOARD_DIR / "config.h").read_text(encoding="utf-8")
@@ -44,7 +44,7 @@ class HiYakaBoardContractTest(unittest.TestCase):
             self.assertRegex(header, rf"#define\s+{name}\s+{re.escape(value)}")
 
     def test_pca9557_safe_write_precedes_direction_change(self):
-        source = (BOARD_DIR / "hi_yaka_v3_board.cc").read_text(encoding="utf-8")
+        source = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
         output_write = source.index(
             "WritePca9557Register(kPcaOutputPortRegister, YAKA_PCA9557_SAFE_OUTPUT)"
         )
@@ -55,7 +55,7 @@ class HiYakaBoardContractTest(unittest.TestCase):
         self.assertEqual(source.count("DECLARE_BOARD("), 1)
 
     def test_m1_does_not_enable_unvalidated_peripherals(self):
-        source = (BOARD_DIR / "hi_yaka_v3_board.cc").read_text(encoding="utf-8")
+        source = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
         self.assertIn("CONFIG_IDF_TARGET_ESP32C6", source)
         self.assertIn("defined(CONFIG_SPIRAM) && CONFIG_SPIRAM", source)
         self.assertIn("DummyAudioCodec", source)

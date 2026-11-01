@@ -19,4 +19,4 @@ upstream https://github.com/78/xiaozhi-esp32.git
 6. 通过独立 PR 合入 `main`；
 7. 在实板回归完成前，不发布 YaKa OTA。
 
-YaKa 对上游核心的修改应尽可能收敛到少量显式接缝。ChatChat HiYaKa 的板级引脚和硬件时序只存在于旧内部兼容目录 `main/boards/chatchat/hi-yaka-v3`，不得修改其他板型来迁就 HiYaKa。该目录名是构建兼容标识，不是对外板名。
+YaKa 对上游核心的修改应尽可能收敛到少量显式接缝。ChatChat HiYaKa 的板级引脚和硬件时序只存在于目录 `main/boards/chatchat/hi-yaka`，不得修改其他板型来迁就 HiYaKa。

@@ -32,7 +32,7 @@ public   -> ChatChatTech/yaka（仅用于受控快照发布，不做日常同步
 - `fix/<topic>`：缺陷修复；
 - `docs/<topic>`：文档与治理；
 - `upstream/<tag-or-date>`：仅在需要审阅较大上游升级时使用的临时集成分支；
-- 发布使用带注释 tag，例如 `yaka-v3-m1.1`，不得用移动标签覆盖旧版本。
+- 发布使用带注释 tag，例如 `hi-yaka-m1.1`，不得用移动标签覆盖旧版本。
 
 日常开发流程：
 

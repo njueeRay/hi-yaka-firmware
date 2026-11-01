@@ -130,7 +130,7 @@
 #### PH1｜可复现构建与安全板型（已完成）
 
 - [x] 固定小智 `v2.5.2 / 49b4380`、ESP-IDF 6.1 和构建镜像；
-- [x] 建立 ChatChat HiYaKa 唯一板型和 ESP32-C6 选择链；当前内部构建标识为 `chatchat/hi-yaka-v3`；
+- [x] 建立 ChatChat HiYaKa 唯一板型和 ESP32-C6 选择链；构建标识为 `chatchat/hi-yaka`；
 - [x] 固化 16 MiB Flash、DIO、无 PSRAM、禁用未经验证设备端 AEC 等约束；
 - [x] 实现启动诊断、I²C 探测和 PCA9557“先安全锁存、后切方向、再回读”顺序；
 - [x] 建立板型静态合同测试和 GitHub Actions 检查；

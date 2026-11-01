@@ -13,7 +13,7 @@
 | target | `esp32c6` |
 | 对外/语义板名 | `HiYaKa` |
 | 所属组织 | `ChatChat` |
-| 当前内部 board/build ID | `chatchat/hi-yaka-v3` / `hi-yaka-v3` |
+| board/build ID | `chatchat/hi-yaka` / `hi-yaka` |
 | Flash | 16 MiB，M1 使用 DIO |
 | PSRAM | 不支持、禁用 |
 

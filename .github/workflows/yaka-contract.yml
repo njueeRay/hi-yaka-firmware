@@ -3,7 +3,7 @@ name: YaKa board contract
 on:
   pull_request:
     paths:
-      - "main/boards/chatchat/hi-yaka-v3/**"
+      - "main/boards/chatchat/hi-yaka/**"
       - "main/CMakeLists.txt"
       - "main/Kconfig.projbuild"
       - "scripts/tests/test_hi_yaka_board.py"
@@ -12,7 +12,7 @@ on:
     branches:
       - main
     paths:
-      - "main/boards/chatchat/hi-yaka-v3/**"
+      - "main/boards/chatchat/hi-yaka/**"
       - "main/CMakeLists.txt"
       - "main/Kconfig.projbuild"
       - "scripts/tests/test_hi_yaka_board.py"
@@ -29,5 +29,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate Hi YaKa board contract
+      - name: Validate HiYaKa board contract
         run: python -m unittest scripts.tests.test_hi_yaka_board -v

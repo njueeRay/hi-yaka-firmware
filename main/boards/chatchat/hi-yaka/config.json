@@ -1,10 +1,10 @@
 {
     "manufacturer": "chatchat",
-    "type": "hi-yaka-v3",
+    "type": "hi-yaka",
     "target": "esp32c6",
     "builds": [
         {
-            "name": "hi-yaka-v3",
+            "name": "hi-yaka",
             "sdkconfig_append": [
                 "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
                 "CONFIG_WAKE_WORD_DISABLED=y",
