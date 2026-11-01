@@ -48,6 +48,7 @@ class HiYaKaBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t i2c_bus_ = nullptr;
     i2c_master_dev_handle_t pca9557_ = nullptr;
+    bool pca_safe_state_verified_ = false;
 
     void LogPlatformBaseline() {
         uint32_t flash_id = 0;
@@ -138,6 +139,7 @@ private:
             configuration == YAKA_PCA9557_SAFE_CONFIGURATION) {
             ESP_LOGI(TAG, "PCA9557 safe state verified: output=0x%02X config=0x%02X", output,
                      configuration);
+            pca_safe_state_verified_ = true;
         } else {
             ESP_LOGE(TAG,
                      "PCA9557 safe-state readback failed: output=0x%02X/%s config=0x%02X/%s",
@@ -171,6 +173,18 @@ public:
         static DummyAudioCodec codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE);
         return &codec;
     }
+
+    bool OtaFirstBootSelfTest() const {
+        const bool heap_available =
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >= 16384;
+        ESP_LOGI(TAG, "OTA first-boot self-test: i2c=%d pca_safe=%d heap=%d",
+                 i2c_bus_ != nullptr, pca_safe_state_verified_, heap_available);
+        return i2c_bus_ != nullptr && pca_safe_state_verified_ && heap_available;
+    }
 };
 
 DECLARE_BOARD(HiYaKaBoard);
+
+bool hi_yaka_ota_first_boot_self_test() {
+    return static_cast<HiYaKaBoard&>(Board::GetInstance()).OtaFirstBootSelfTest();
+}

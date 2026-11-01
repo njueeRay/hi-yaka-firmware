@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "board": "hi-yaka",
+  "flash_bytes": 16777216,
+  "partition_table": "partitions/hi-yaka-16m.csv",
+  "ota_slot_bytes": 4128768,
+  "app_image_max_bytes": 3866624,
+  "internal_ram_max_percent": 90.0,
+  "product_event_queue_capacity": 32,
+  "audio_descriptor_queue_capacity": 12,
+  "storage_write_queue_capacity": 8,
+  "additional_product_tasks": 0,
+  "upstream": {
+    "repository": "https://github.com/78/xiaozhi-esp32.git",
+    "tag": "v2.5.2",
+    "commit": "49b4380b3faa0ceadd28a3e78aaf0f311c46c57e"
+  },
+  "esp_idf": "v6.1"
+}

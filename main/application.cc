@@ -75,6 +75,21 @@ void Application::Initialize() {
     ESP_LOGI(TAG, "After board/audio init");
     SystemInfo::PrintHeapStats();
 
+#if defined(CONFIG_BOARD_TYPE_HI_YAKA) && CONFIG_BOARD_TYPE_HI_YAKA
+    // ESP-IDF 6.1 leaves a freshly updated image pending until the application
+    // confirms it. HiYaKa confirms only after its board safe-state and the core
+    // display/audio services have initialized; cloud availability is deliberately
+    // not part of the checkpoint, otherwise an offline device would roll back.
+    extern bool hi_yaka_ota_first_boot_self_test();
+    if (hi_yaka_ota_first_boot_self_test()) {
+        if (!Ota::MarkCurrentVersionValid()) {
+            ESP_LOGE(TAG, "Unable to confirm the pending HiYaKa application");
+        }
+    } else if (!Ota::RollbackCurrentVersion()) {
+        ESP_LOGE(TAG, "HiYaKa self-test failed and no rollback image was available");
+    }
+#endif
+
     AudioServiceCallbacks callbacks;
     callbacks.on_send_queue_available = [this]() {
         xEventGroupSetBits(event_group_, MAIN_EVENT_SEND_AUDIO);

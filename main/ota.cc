@@ -257,24 +257,37 @@ NetworkResult<> Ota::CheckVersion() {
     return {};
 }
 
-void Ota::MarkCurrentVersionValid() {
+bool Ota::MarkCurrentVersionValid() {
     auto partition = esp_ota_get_running_partition();
     if (strcmp(partition->label, "factory") == 0) {
         ESP_LOGI(TAG, "Running from factory partition, skipping");
-        return;
+        return true;
     }
 
     ESP_LOGI(TAG, "Running partition: %s", partition->label);
     esp_ota_img_states_t state;
     if (esp_ota_get_state_partition(partition, &state) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get state of partition");
-        return;
+        return false;
     }
 
     if (state == ESP_OTA_IMG_PENDING_VERIFY) {
         ESP_LOGI(TAG, "Marking firmware as valid");
-        esp_ota_mark_app_valid_cancel_rollback();
+        return esp_ota_mark_app_valid_cancel_rollback() == ESP_OK;
     }
+    return true;
+}
+
+bool Ota::RollbackCurrentVersion() {
+    auto partition = esp_ota_get_running_partition();
+    esp_ota_img_states_t state;
+    if (strcmp(partition->label, "factory") == 0 ||
+        esp_ota_get_state_partition(partition, &state) != ESP_OK ||
+        state != ESP_OTA_IMG_PENDING_VERIFY) {
+        return false;
+    }
+    ESP_LOGE(TAG, "HiYaKa first-boot self-test failed; requesting rollback");
+    return esp_ota_mark_app_invalid_rollback_and_reboot() == ESP_OK;
 }
 
 bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progress, size_t speed)> callback) {

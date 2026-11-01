@@ -54,6 +54,19 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertLess(output_write, direction_write)
         self.assertEqual(source.count("DECLARE_BOARD("), 1)
 
+    def test_ota_confirmation_waits_for_board_safe_state(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        application = (ROOT / "main" / "application.cc").read_text(encoding="utf-8")
+        ota = (ROOT / "main" / "ota.cc").read_text(encoding="utf-8")
+        self.assertIn("pca_safe_state_verified_ = true", board)
+        self.assertIn("hi_yaka_ota_first_boot_self_test", application)
+        self.assertLess(
+            application.index("hi_yaka_ota_first_boot_self_test"),
+            application.index("AudioServiceCallbacks callbacks"),
+        )
+        self.assertIn("esp_ota_mark_app_valid_cancel_rollback", ota)
+        self.assertIn("esp_ota_mark_app_invalid_rollback_and_reboot", ota)
+
     def test_m1_does_not_enable_unvalidated_peripherals(self):
         source = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
         self.assertIn("CONFIG_IDF_TARGET_ESP32C6", source)

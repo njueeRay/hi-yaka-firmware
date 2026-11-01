@@ -81,7 +81,14 @@
 
 后续实板诊断还必须增加内部堆最小值、最大连续块、任务栈高水位、音频丢帧、UI 刷新和复位原因；PH2 不伪造这些数据。
 
-## 8. 测试
+## 8. PH4 OTA 与构建保障
+
+- `update_assurance.*`：校验板型、版本、硬件修订、镜像容量、SHA-256 格式和签名验证结果，并用纯逻辑状态机覆盖网络中断、空间不足、摘要/签名失败、配置迁移失败、首启自检和确认超时；
+- `ConfigurationMigrationTransaction`：只通过配置存储端口执行快照、应用、校验、提交和恢复，不持有录音存储端口；
+- HiYaKa 首启确认点：PCA9557 安全态回读、I²C 总线和最小连续内部堆检查通过后才确认 OTA；失败则请求 ESP-IDF 回滚；
+- 详细分区、预算、CI 归档和证据边界见[OTA、资源预算与构建追溯合同](../../docs/yaka/update-assurance.md)。
+
+## 9. 测试
 
 ```bash
 cmake -S tests/yaka_host -B /tmp/hi-yaka-host
@@ -91,7 +98,7 @@ ctest --test-dir /tmp/hi-yaka-host --output-on-failure
 
 覆盖固定容量满载策略、多生产者、启动、对话打断/断网恢复/取消/超时、可配置按键、200×320 页面流、可靠录音提交、满盘、截断、重复启动、随机中断、OTA 确认、受控关机和非关键能力降级。
 
-## 9. 设计证据
+## 10. 设计证据
 
 - [ESP-IDF 6.1 FreeRTOS 文档](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32c6/api-reference/system/freertos_idf.html)：确认任务/同步原语属于 IDF 运行时边界；
 - [FreeRTOS Kernel `queue.h`](https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/main/include/queue.h)：静态队列由调用方提供存储、容量固定，满载返回明确结果；
