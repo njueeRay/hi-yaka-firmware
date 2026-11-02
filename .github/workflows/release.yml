@@ -20,7 +20,7 @@ concurrency:
 jobs:
   prepare:
     name: Validate release and select all variants
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.prepare.outputs.version }}
       tag: ${{ steps.prepare.outputs.tag }}
@@ -63,7 +63,7 @@ jobs:
   build:
     name: Build ${{ matrix.full_name }}
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: espressif/idf:v6.1
     strategy:
@@ -96,7 +96,7 @@ jobs:
   release:
     name: Verify every firmware and publish release
     needs: [prepare, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
