@@ -946,6 +946,7 @@ if(CONFIG_BOARD_TYPE_HI_YAKA)
         "yaka/capability_registry.cc"
         "yaka/product_controller.cc"
         "yaka/recording_store.cc"
+        "yaka/runtime_adapter.cc"
         "yaka/update_assurance.cc"
     )
     list(APPEND INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/yaka")

@@ -13,6 +13,7 @@
 - [首板上电与基础验证手册](FIRST_BOARD_VALIDATION.md)：限流上电、下载、串口、Flash、I²C 和 PCA9557；
 - [模块测试矩阵](MODULE_TEST_MATRIX.md)：显示、输入、音频、TF、NFC、IMU、反馈、电量、网络、OTA 和长稳；
 - [证据等级与里程碑矩阵](EVIDENCE_LEVEL_MATRIX.md)：L0–L3 与 M1–M7 的关闭条件；
+- [实板前适配状态与首板启用顺序](PREBOARD_ADAPTER_STATUS.md)：安全构建、实验构建、M2–M5 L0 适配与逐项启用顺序；
 - `scripts/hi_yaka_evidence.py`：生成、记录和校验样机证据包。
 
 ## 2. 不可跳过的身份绑定

@@ -2,12 +2,12 @@
 
 本仓库是 ChatChat HiYaKa 的私有产品固件仓库，基于 `78/xiaozhi-esp32` 的固定发布基线开发。
 
-- 当前阶段：`M1 — 最小板级启动与总线安全态`
+- 当前阶段：`M1 待首板；M2–M5 实板前 L0 适配已就绪`
 - 上游基线：`xiaozhi-esp32 v2.5.2` / `49b4380b3faa0ceadd28a3e78aaf0f311c46c57e`
 - 目标：ESP32-C6、ESP-IDF 6.1、16 MiB 外置 Flash、无 PSRAM
 - 当前板型：ChatChat HiYaKa（构建标识：`chatchat/hi-yaka`）
 
-M1 只覆盖构建、启动诊断、UART 日志、I2C 探测和 PCA9557 安全默认态；LCD、TF、音频、NFC 业务和产品交互尚未进入实板通过状态。文档总入口见 [HiYaKa 固件文档索引](docs/README.md)，总体设计见 [固件总体架构](docs/yaka/firmware-architecture.md)，阶段边界见 [M1 基线说明](docs/yaka/m1-baseline.md)，硬件入口见 [板型文档](main/boards/chatchat/hi-yaka/README.md)。
+`hi-yaka` 继续只覆盖构建、启动诊断、UART、I²C 探测和 PCA9557 安全默认态；`hi-yaka-lab` 用于编译和逐项验证显示、输入、反馈、电池、音频、TF 与产品运行时。所有这些仍是 L0 软件证据，LCD、TF、音频、NFC 业务和产品交互均未取得实板通过结论。文档总入口见 [HiYaKa 固件文档索引](docs/README.md)，总体设计见 [固件总体架构](docs/yaka/firmware-architecture.md)，首板顺序见 [实板前适配状态](docs/bringup/PREBOARD_ADAPTER_STATUS.md)，硬件入口见 [板型文档](main/boards/chatchat/hi-yaka/README.md)。
 
 ---
 

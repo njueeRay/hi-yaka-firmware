@@ -5,6 +5,7 @@
 
 #include <esp_codec_dev.h>
 #include <esp_codec_dev_defaults.h>
+#include <driver/i2c_types.h>
 #include <mutex>
 
 
@@ -34,7 +35,10 @@ public:
                   gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
                   gpio_num_t pa_pin, uint8_t es8311_addr, uint8_t es7210_addr, bool input_reference,
                   float input_gain = 30.0f, int reference_gain_channel = -1,
-                  float reference_gain = 0.0f);
+                  float reference_gain = 0.0f,
+                  i2c_port_t i2c_port = static_cast<i2c_port_t>(1),
+                  uint32_t es7210_mic_mask =
+                      ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4);
     virtual ~BoxAudioCodec();
 
     virtual void SetOutputVolume(int volume) override;

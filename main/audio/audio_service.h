@@ -51,6 +51,7 @@
 #define AS_EVENT_AUDIO_TESTING_RUNNING (1 << 0)
 #define AS_EVENT_WAKE_WORD_RUNNING (1 << 1)
 #define AS_EVENT_AUDIO_PROCESSOR_RUNNING (1 << 2)
+#define AS_EVENT_LOCAL_RECORDING_RUNNING (1 << 3)
 #define AS_EVENT_AUDIO_INPUT_STOP_REQUEST (1 << 4)
 
 #define AS_OPUS_GET_FRAME_DRU_ENUM(duration_ms)                  \
@@ -137,7 +138,15 @@ public:
     void ReleaseWakeWordResources();
     void EnableVoiceProcessing(bool enable);
     void EnableAudioTesting(bool enable);
+    void EnableLocalRecording(bool enable);
     void EnableDeviceAec(bool enable);
+
+    using InputPcmCallback =
+        std::function<void(const int16_t* samples, size_t sample_count, int channels,
+                           int sample_rate)>;
+    void SetInputPcmCallback(InputPcmCallback callback) {
+        input_pcm_callback_ = std::move(callback);
+    }
 
     void SetCallbacks(AudioServiceCallbacks& callbacks);
 
@@ -199,6 +208,7 @@ private:
 
     bool audio_engine_initialized_ = false;
     bool voice_detected_ = false;
+    InputPcmCallback input_pcm_callback_;
 #if CONFIG_USE_DEVICE_AEC
     bool device_aec_enabled_ = true;
 #else

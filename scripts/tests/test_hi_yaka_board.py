@@ -14,7 +14,7 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertEqual(config["manufacturer"], "chatchat")
         self.assertEqual(config["type"], "hi-yaka")
         self.assertEqual(config["target"], "esp32c6")
-        self.assertEqual(len(config["builds"]), 1)
+        self.assertEqual(len(config["builds"]), 2)
         build = config["builds"][0]
         self.assertEqual(build["name"], "hi-yaka")
         options = set(build["sdkconfig_append"])
@@ -22,6 +22,13 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_ESPTOOLPY_FLASHMODE_DIO=y", options)
         self.assertIn("CONFIG_WAKE_WORD_DISABLED=y", options)
         self.assertNotIn("CONFIG_USE_DEVICE_AEC=y", options)
+        self.assertFalse(any(option.startswith("CONFIG_HI_YAKA_ENABLE_") for option in options))
+
+        lab_build = config["builds"][1]
+        self.assertEqual(lab_build["name"], "hi-yaka-lab")
+        lab_options = set(lab_build["sdkconfig_append"])
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", lab_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_STORAGE=y", lab_options)
 
     def test_build_selection_chain_is_complete(self):
         kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
@@ -44,15 +51,15 @@ class HiYaKaBoardContractTest(unittest.TestCase):
             self.assertRegex(header, rf"#define\s+{name}\s+{re.escape(value)}")
 
     def test_pca9557_safe_write_precedes_direction_change(self):
-        source = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
-        output_write = source.index(
-            "WritePca9557Register(kPcaOutputPortRegister, YAKA_PCA9557_SAFE_OUTPUT)"
-        )
+        source = (BOARD_DIR / "hi_yaka_pca9557.cc").read_text(encoding="utf-8")
+        output_write = source.index("WriteRegisterLocked(kOutputPortRegister, output_shadow_)")
         direction_write = source.index(
-            "WritePca9557Register(kPcaConfigurationRegister,"
+            "WriteRegisterLocked(kConfigurationRegister, YAKA_PCA9557_SAFE_CONFIGURATION)"
         )
         self.assertLess(output_write, direction_write)
-        self.assertEqual(source.count("DECLARE_BOARD("), 1)
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        self.assertIn("pca9557_->InitializeSafe()", board)
+        self.assertEqual(board.count("DECLARE_BOARD("), 1)
 
     def test_ota_confirmation_waits_for_board_safe_state(self):
         board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
@@ -67,12 +74,30 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("esp_ota_mark_app_valid_cancel_rollback", ota)
         self.assertIn("esp_ota_mark_app_invalid_rollback_and_reboot", ota)
 
-    def test_m1_does_not_enable_unvalidated_peripherals(self):
+    def test_safe_build_does_not_enable_unvalidated_peripherals(self):
+        config = json.loads((BOARD_DIR / "config.json").read_text(encoding="utf-8"))
+        safe_options = set(config["builds"][0]["sdkconfig_append"])
+        self.assertFalse(any(option.startswith("CONFIG_HI_YAKA_ENABLE_") for option in safe_options))
         source = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
         self.assertIn("CONFIG_IDF_TARGET_ESP32C6", source)
         self.assertIn("defined(CONFIG_SPIRAM) && CONFIG_SPIRAM", source)
         self.assertIn("DummyAudioCodec", source)
-        self.assertNotRegex(source, r"Es7210|Es8311AudioCodec|esp_lcd_new_panel|esp_vfs_fat")
+
+    def test_lcd_does_not_consume_the_only_user_spi_controller(self):
+        lcd_io = (BOARD_DIR / "hi_yaka_expander_lcd_io.cc").read_text(encoding="utf-8")
+        self.assertIn("parlio_new_tx_unit", lcd_io)
+        self.assertNotIn("spi_bus_initialize", lcd_io)
+        self.assertNotIn("spi_bus_add_device", lcd_io)
+        self.assertIn("YAKA_TF_SCLK_GPIO GPIO_NUM_19", (BOARD_DIR / "config.h").read_text(encoding="utf-8"))
+
+    def test_recording_commit_is_rejected_after_loss_or_write_failure(self):
+        runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("ports.storage = this", runtime)
+        self.assertIn("recording_fault_.store(true)", runtime)
+        self.assertIn("dropped_blocks_.load() != 0", runtime)
+        self.assertIn("port->AbortRecording()", runtime)
 
 
 if __name__ == "__main__":
