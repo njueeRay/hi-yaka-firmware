@@ -2,7 +2,7 @@
 
 #include "application.h"
 #include "board.h"
-#include "hi_yaka_board_api.h"
+#include "boards/chatchat/hi-yaka/hi_yaka_board_api.h"
 #include "wifi_board.h"
 
 #include <algorithm>
