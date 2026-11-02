@@ -30,7 +30,7 @@ class HiYaKaAssuranceTest(unittest.TestCase):
         self.assertEqual(result["partitions"][3]["size"], 0x3F0000)
         self.assertEqual(result["partitions"][4]["offset"], 0x410000)
         self.assertGreater(result["unallocated_bytes"], 0)
-        self.assertEqual(assurance.validate_source_budgets(policy)["additional_product_tasks"], 0)
+        self.assertEqual(assurance.validate_source_budgets(policy)["additional_product_tasks"], 1)
 
     def test_overlap_is_rejected(self):
         policy = assurance.load_policy(POLICY)

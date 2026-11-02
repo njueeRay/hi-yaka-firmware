@@ -9,7 +9,7 @@
   "product_event_queue_capacity": 32,
   "audio_descriptor_queue_capacity": 12,
   "storage_write_queue_capacity": 8,
-  "additional_product_tasks": 0,
+  "additional_product_tasks": 1,
   "upstream": {
     "repository": "https://github.com/78/xiaozhi-esp32.git",
     "tag": "v2.5.2",

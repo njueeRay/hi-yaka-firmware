@@ -1155,6 +1155,54 @@ menu "Camera Configuration"
     endif
 endmenu
 
+menu "HiYaKa pre-board laboratory features"
+    depends on BOARD_TYPE_HI_YAKA
+
+    config HI_YAKA_ENABLE_DISPLAY
+        bool "Enable provisional ST7789 display adapter"
+        default n
+        help
+            Compile and start the ST7789 path whose CS/DC/RST/backlight are
+            controlled through PCA9557. Geometry is authoritative; panel
+            orientation, offsets, inversion and color order remain provisional
+            until verified on a physical HiYaKa board.
+
+    config HI_YAKA_ENABLE_INPUT
+        bool "Enable provisional physical input adapter"
+        default n
+        help
+            Enable the two direct keys and the six-key ADC ladder using
+            schematic-derived provisional windows. Physical-board calibration
+            remains mandatory before this can be a release setting.
+
+    config HI_YAKA_ENABLE_FEEDBACK
+        bool "Enable bounded RGB and vibration feedback"
+        default n
+
+    config HI_YAKA_ENABLE_BATTERY
+        bool "Enable voltage-only battery observer"
+        default n
+
+    config HI_YAKA_ENABLE_AUDIO
+        bool "Enable ES7210/ES8311 audio candidate"
+        default n
+        help
+            Laboratory-only until microphone slots, gain and PA sequencing are
+            verified on a physical board.
+
+    config HI_YAKA_ENABLE_STORAGE
+        bool "Enable TF/SDSPI candidate"
+        default n
+
+    config HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        bool "Enable bounded PN532/QMI8658 polling candidates"
+        default n
+
+    config HI_YAKA_ENABLE_PRODUCT_RUNTIME
+        bool "Bind HiYaKa product runtime to the upstream application"
+        default n
+endmenu
+
 menu "TAIJIPAI_S3_CONFIG"
     depends on BOARD_TYPE_TAIJI_PI_S3
     choice I2S_TYPE_TAIJIPI_S3

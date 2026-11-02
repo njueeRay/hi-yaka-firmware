@@ -12,6 +12,10 @@
 #include "text_glyph_payload.h"
 #include "websocket_protocol.h"
 
+#if defined(CONFIG_BOARD_TYPE_HI_YAKA) && CONFIG_BOARD_TYPE_HI_YAKA
+#include "runtime_adapter.h"
+#endif
+
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <arpa/inet.h>
@@ -108,9 +112,18 @@ void Application::Initialize() {
     };
     audio_service_.SetCallbacks(callbacks);
 
+#if defined(CONFIG_BOARD_TYPE_HI_YAKA) && CONFIG_BOARD_TYPE_HI_YAKA && \
+    CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
+    hi_yaka::RuntimeAdapter::Get().Initialize();
+#endif
+
     // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_STATE_CHANGED);
+#if defined(CONFIG_BOARD_TYPE_HI_YAKA) && CONFIG_BOARD_TYPE_HI_YAKA && \
+    CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
+        hi_yaka::RuntimeAdapter::Get().OnDeviceState(new_state);
+#endif
     });
 
     // Start the clock timer to update the status bar
@@ -124,6 +137,11 @@ void Application::Initialize() {
     // Set network event callback for UI updates and network state handling
     board.SetNetworkEventCallback([this](NetworkEvent event, const std::string& data) {
         auto display = Board::GetInstance().GetDisplay();
+
+#if defined(CONFIG_BOARD_TYPE_HI_YAKA) && CONFIG_BOARD_TYPE_HI_YAKA && \
+    CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
+        hi_yaka::RuntimeAdapter::Get().OnNetworkEvent(event);
+#endif
 
         switch (event) {
             case NetworkEvent::Scanning:

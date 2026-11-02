@@ -10,7 +10,8 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
                              gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout,
                              gpio_num_t din, gpio_num_t pa_pin, uint8_t es8311_addr,
                              uint8_t es7210_addr, bool input_reference, float input_gain,
-                             int reference_gain_channel, float reference_gain) {
+                             int reference_gain_channel, float reference_gain,
+                             i2c_port_t i2c_port, uint32_t es7210_mic_mask) {
     duplex_ = true;                              // 是否双工
     input_reference_ = input_reference;          // 是否使用参考输入，实现回声消除
     input_channels_ = input_reference_ ? 2 : 1;  // 输入通道数
@@ -33,7 +34,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
 
     // Output
     audio_codec_i2c_cfg_t i2c_cfg = {
-        .port = (i2c_port_t)1,
+        .port = i2c_port,
         .addr = es8311_addr,
         .bus_handle = i2c_master_handle,
     };
@@ -69,7 +70,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
 
     es7210_codec_cfg_t es7210_cfg = {};
     es7210_cfg.ctrl_if = in_ctrl_if_;
-    es7210_cfg.mic_selected = ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4;
+    es7210_cfg.mic_selected = es7210_mic_mask;
     in_codec_if_ = es7210_codec_new(&es7210_cfg);
     assert(in_codec_if_ != NULL);
 

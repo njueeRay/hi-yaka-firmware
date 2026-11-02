@@ -118,6 +118,7 @@ void AudioService::Start() {
     service_stopped_.store(false);
     xEventGroupClearBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
                                            AS_EVENT_AUDIO_PROCESSOR_RUNNING |
+                                           AS_EVENT_LOCAL_RECORDING_RUNNING |
                                            AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
 
     esp_timer_start_periodic(audio_power_timer_, 1000000);
@@ -174,7 +175,8 @@ void AudioService::Stop() {
     esp_timer_stop(audio_power_timer_);
     service_stopped_.store(true);
     xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_TESTING_RUNNING | AS_EVENT_WAKE_WORD_RUNNING |
-                                         AS_EVENT_AUDIO_PROCESSOR_RUNNING);
+                                         AS_EVENT_AUDIO_PROCESSOR_RUNNING |
+                                         AS_EVENT_LOCAL_RECORDING_RUNNING);
 
     bool notify_drained = false;
     {
@@ -236,13 +238,18 @@ bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, in
     audio_debugger_->Feed(data);
 #endif
 
+    if (input_pcm_callback_) {
+        input_pcm_callback_(data.data(), data.size(), codec_->input_channels(), sample_rate);
+    }
+
     return true;
 }
 
 void AudioService::AudioInputTask() {
     constexpr EventBits_t kAudioInputActiveBits = AS_EVENT_AUDIO_TESTING_RUNNING |
                                                   AS_EVENT_WAKE_WORD_RUNNING |
-                                                  AS_EVENT_AUDIO_PROCESSOR_RUNNING;
+                                                  AS_EVENT_AUDIO_PROCESSOR_RUNNING |
+                                                  AS_EVENT_LOCAL_RECORDING_RUNNING;
 
     while (true) {
         EventBits_t bits = xEventGroupWaitBits(
@@ -312,6 +319,16 @@ void AudioService::AudioInputTask() {
             std::vector<int16_t> data;
             if (ReadAudioData(data, 16000, samples)) {
                 audio_engine_->Feed(std::move(data));
+                continue;
+            }
+        }
+
+        // Local recording shares the single I2S RX owner. The callback above
+        // copies a bounded block; this branch only performs a read when no
+        // dialogue/testing consumer already did so.
+        if (bits & AS_EVENT_LOCAL_RECORDING_RUNNING) {
+            std::vector<int16_t> data;
+            if (ReadAudioData(data, 16000, 160)) {
                 continue;
             }
         }
@@ -745,6 +762,16 @@ void AudioService::EnableAudioTesting(bool enable) {
             playback_drained_notified_ = false;
         }
         audio_queue_cv_.notify_all();
+    }
+}
+
+void AudioService::EnableLocalRecording(bool enable) {
+    ESP_LOGI(TAG, "%s local recording capture", enable ? "Enabling" : "Disabling");
+    if (enable) {
+        xEventGroupSetBits(event_group_, AS_EVENT_LOCAL_RECORDING_RUNNING);
+    } else {
+        xEventGroupClearBits(event_group_, AS_EVENT_LOCAL_RECORDING_RUNNING);
+        xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_INPUT_STOP_REQUEST);
     }
 }
 
