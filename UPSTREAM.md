@@ -17,6 +17,6 @@ upstream https://github.com/78/xiaozhi-esp32.git
 4. 只处理上游差异和冲突，不混入新功能；
 5. 运行 host tests、HiYaKa 板型构建和至少一个上游 ESP32-C6 代表板型构建；
 6. 通过独立 PR 合入 `main`；
-7. 在实板回归完成前，不发布 YaKa OTA。
+7. 在实板回归完成前，不发布 HiYaKa OTA。
 
-YaKa 对上游核心的修改应尽可能收敛到少量显式接缝。ChatChat HiYaKa 的板级引脚和硬件时序只存在于目录 `main/boards/chatchat/hi-yaka`，不得修改其他板型来迁就 HiYaKa。
+HiYaKa 对上游核心的修改应尽可能收敛到少量显式接缝。ChatChat HiYaKa 的板级引脚和硬件时序只存在于目录 `main/boards/chatchat/hi-yaka`，不得修改其他板型来迁就 HiYaKa。
