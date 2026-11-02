@@ -12,6 +12,16 @@ PARTITION = ROOT / "partitions" / "hi-yaka-16m.csv"
 
 
 class HiYaKaAssuranceTest(unittest.TestCase):
+    def test_github_jobs_pin_ubuntu_24_04(self):
+        workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+        self.assertTrue(workflows)
+        job_count = 0
+        for workflow in workflows:
+            content = workflow.read_text(encoding="utf-8")
+            self.assertNotIn("runs-on: ubuntu-latest", content, workflow.name)
+            job_count += content.count("runs-on: ubuntu-24.04")
+        self.assertEqual(job_count, 8)
+
     def test_frozen_partition_and_source_budgets(self):
         policy = assurance.load_policy(POLICY)
         result = assurance.validate_partition(policy, PARTITION)
