@@ -166,11 +166,11 @@ Custom Assets Tools:
 
 - [78/xiaozhi-assets-generator](https://github.com/78/xiaozhi-assets-generator) Custom Assets Generator (Wake words, fonts, emojis, backgrounds)
 
-## About the Project
+## License
 
-This is an open-source ESP32 project, released under the MIT license, allowing anyone to use it for free, including for commercial purposes.
+This repository has a split license. ChatChat-authored HiYaKa materials are source-available under the PolyForm Noncommercial License 1.0.0 and may not be used commercially without a separate written license from ChatChatTech. XiaoZhi-derived and other third-party materials retain their original licenses, primarily MIT. See [LICENSE](LICENSE) and [LICENSE_SCOPE.md](LICENSE_SCOPE.md) for the exact boundary.
 
-We hope this project helps everyone understand AI hardware development and apply rapidly evolving large language models to real hardware devices.
+The noncommercial terms do not revoke or narrow rights already granted by upstream or third-party licenses.
 
 If you have any ideas or suggestions, please feel free to raise Issues or join our [Discord](https://discord.gg/C759fGMBcZ) or QQ group: 1095994019
 

@@ -12,6 +12,22 @@ PARTITION = ROOT / "partitions" / "hi-yaka-16m.csv"
 
 
 class HiYaKaAssuranceTest(unittest.TestCase):
+    def test_license_boundary_is_explicit(self):
+        notice = (ROOT / "LICENSE").read_text(encoding="utf-8")
+        scope = (ROOT / "LICENSE_SCOPE.md").read_text(encoding="utf-8")
+        polyform = ROOT / "LICENSES" / "PolyForm-Noncommercial-1.0.0.md"
+        upstream_mit = ROOT / "LICENSES" / "MIT-xiaozhi-esp32.txt"
+        self.assertIn("Commercial use is not granted", notice)
+        self.assertIn("Required Notice: Copyright 2026 ChatChatTech.", notice)
+        self.assertIn("main/boards/chatchat/hi-yaka/", scope)
+        self.assertIn("main/yaka/", scope)
+        self.assertIn("不覆盖小智", scope)
+        self.assertTrue(polyform.is_file())
+        self.assertTrue(upstream_mit.is_file())
+        self.assertIn("PolyForm Noncommercial License 1.0.0",
+                      polyform.read_text(encoding="utf-8"))
+        self.assertIn("MIT License", upstream_mit.read_text(encoding="utf-8"))
+
     def test_github_jobs_pin_ubuntu_24_04(self):
         workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
         self.assertTrue(workflows)

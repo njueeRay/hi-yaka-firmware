@@ -1,22 +1,21 @@
-MIT License
+HiYaKa Firmware Licensing Notice
 
-Copyright (c) 2025 Shenzhen Xinzhi Future Technology Co., Ltd.
-Copyright (c) 2025 Project Contributors
+This repository contains software under more than one license.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. ChatChat-authored HiYaKa materials are licensed under the
+   PolyForm Noncommercial License 1.0.0. Commercial use is not granted.
+   See LICENSES/PolyForm-Noncommercial-1.0.0.md and LICENSE_SCOPE.md.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. XiaoZhi-derived and other third-party materials remain under their
+   original licenses. The preserved XiaoZhi MIT license is available at
+   LICENSES/MIT-xiaozhi-esp32.txt. Component-specific license files remain
+   authoritative for their components.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. This notice does not revoke, narrow, or replace rights granted by any
+   third-party license. In mixed files, the PolyForm terms apply only to
+   copyright interests owned or licensable by ChatChatTech.
+
+Required Notice: Copyright 2026 ChatChatTech.
+
+Commercial use of the ChatChat-authored materials requires a separate written
+license from ChatChatTech.
