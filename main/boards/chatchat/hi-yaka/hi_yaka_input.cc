@@ -48,13 +48,13 @@ HiYaKaInput::~HiYaKaInput() {
 
 esp_err_t HiYaKaInput::Initialize(Callback callback) {
     callback_ = std::move(callback);
-    gpio_config_t gpio_config = {};
-    gpio_config.pin_bit_mask = (1ULL << YAKA_KEY_A_GPIO) | (1ULL << YAKA_KEY_B_GPIO);
-    gpio_config.mode = GPIO_MODE_INPUT;
-    gpio_config.pull_up_en = GPIO_PULLUP_ENABLE;
-    gpio_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    gpio_config.intr_type = GPIO_INTR_DISABLE;
-    esp_err_t result = gpio_config(&gpio_config);
+    gpio_config_t input_config = {};
+    input_config.pin_bit_mask = (1ULL << YAKA_KEY_A_GPIO) | (1ULL << YAKA_KEY_B_GPIO);
+    input_config.mode = GPIO_MODE_INPUT;
+    input_config.pull_up_en = GPIO_PULLUP_ENABLE;
+    input_config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    input_config.intr_type = GPIO_INTR_DISABLE;
+    esp_err_t result = gpio_config(&input_config);
     if (result != ESP_OK) {
         return result;
     }
