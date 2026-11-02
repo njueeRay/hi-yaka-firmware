@@ -90,6 +90,15 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertNotIn("spi_bus_add_device", lcd_io)
         self.assertIn("YAKA_TF_SCLK_GPIO GPIO_NUM_19", (BOARD_DIR / "config.h").read_text(encoding="utf-8"))
 
+    def test_recording_commit_is_rejected_after_loss_or_write_failure(self):
+        runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("ports.storage = this", runtime)
+        self.assertIn("recording_fault_.store(true)", runtime)
+        self.assertIn("dropped_blocks_.load() != 0", runtime)
+        self.assertIn("port->AbortRecording()", runtime)
+
 
 if __name__ == "__main__":
     unittest.main()

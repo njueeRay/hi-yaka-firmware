@@ -20,6 +20,7 @@ namespace hi_yaka {
 class RuntimeAdapter final : public DisplayPort,
                              public InputPort,
                              public AudioPort,
+                             public StoragePort,
                              public NetworkPort,
                              public NfcPort,
                              public ImuPort,
@@ -40,6 +41,9 @@ public:
     void CancelDialogue() override;
     bool StartRecordingCapture() override;
     void StopRecordingCapture() override;
+    bool OpenRecording() override;
+    bool CommitRecording() override;
+    void AbortRecording() override;
     bool BeginProvisioning() override;
     bool BeginDialogueSession() override;
     void CancelOperation() override;
@@ -73,6 +77,7 @@ private:
     std::atomic<bool> initialized_{false};
     std::atomic<bool> recording_active_{false};
     std::atomic<bool> writer_busy_{false};
+    std::atomic<bool> recording_fault_{false};
     std::atomic<uint32_t> dropped_blocks_{0};
     uint32_t next_correlation_id_ = 0x48000000U;
 };

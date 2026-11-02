@@ -2,8 +2,8 @@
 #define _HI_YAKA_CONFIG_H_
 
 #include <driver/gpio.h>
-#include <driver/adc_types_legacy.h>
 #include <driver/i2c_types.h>
+#include <esp_adc/adc_oneshot.h>
 
 // M1 uses a dummy codec. These rates are placeholders for the application
 // interface and are not the final HiYaKa audio contract.
@@ -37,8 +37,9 @@
 #define YAKA_PCA9557_LCD_CS_BIT 6
 #define YAKA_PCA9557_LCD_DC_BIT 7
 
-// ST7789 SPI path. CS/DC/RST/BL are not direct MCU GPIOs and must only be
-// driven through HiYaKaPca9557.
+// ST7789 serial path uses PARLIO so SPI2 remains dedicated to the TF card.
+// CS/DC/RST/BL are not direct MCU GPIOs and must only be driven through
+// HiYaKaPca9557.
 #define YAKA_LCD_MOSI_GPIO GPIO_NUM_6
 #define YAKA_LCD_SCLK_GPIO GPIO_NUM_7
 #define YAKA_LCD_PIXEL_CLOCK_HZ (10 * 1000 * 1000)

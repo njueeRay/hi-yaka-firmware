@@ -1,6 +1,6 @@
 # ChatChat HiYaKa 板型
 
-状态：`M1 最小板级基线`。本目录不是完整产品固件，也不代表实板外设已经通过。
+状态：`M1 安全基线 + M2–M5 实板前 L0 适配`。本目录不是完整产品固件，也不代表任何外设已经通过实板验证。
 
 命名说明：板子的对外名称统一为 HiYaKa，所属组织为 ChatChat；全小写短横线形式用 `hi-yaka`，全大写下划线形式用 `HI_YAKA`。
 
@@ -29,14 +29,14 @@
 
 对应寄存器：Output Port=`0x40`，Configuration=`0x38`。这些值来自 2026-10-21 最终硬件复审；如果活体原理图再次修改，必须重新审计后再改代码。
 
-## M1 明确未接入
+## 实板前 L0 适配
 
-- 真实 ES7210/ES8311 音频链路；当前使用 `DummyAudioCodec`；
-- ST7789 显示与按键交互；
-- TF/SDSPI；
-- PN532/QMI8658A 轮询业务；
-- RGB、振动控制和电池百分比；
-- 产品状态机、录音和 OTA 策略。
+- `hi-yaka`：保持上述 M1 安全基线，所有未验证外设默认关闭；
+- `hi-yaka-lab`：编译 ST7789/PARLIO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs 和产品运行时；
+- LCD 使用 PARLIO GPIO6/7，TF 独占 SPI2 GPIO15/18/19/20，避免争用 ESP32-C6 唯一用户 SPI 控制器；
+- 本地录音复用 AudioService 单一 I²S RX 所有者，经容量 12 的有界队列交给独立写卡任务；
+- PN532/QMI8658A 当前只进入地址探测和能力降级，不含 M6 产品业务；
+- 全部参数仍须按 `docs/bringup/PREBOARD_ADAPTER_STATUS.md` 逐项取得 L1/L2 证据。
 
 ## 构建
 
@@ -48,3 +48,5 @@ python3 scripts/build.py chatchat/hi-yaka \
 ```
 
 构建成功只证明软件链接和配置链成立，不证明 PUYA Flash、I2C 地址或安全电平已经通过实板验证。
+
+全适配编译使用 `--name hi-yaka-lab`。该产物只用于 CI 和受控实验室调试，不应跳过 M1 直接烧录到未知状态首板。

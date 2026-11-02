@@ -14,7 +14,7 @@
 状态标记：
 
 - **L0 已确认**：原理图、PCB、网表、源码或构建层面的静态证据已闭合；
-- **M1 已实现**：当前固件已经编码，但尚不代表实板通过；
+- **L0 已实现**：当前固件已经编码并接受构建/静态门禁，但尚不代表实板通过；
 - **待 L1/L2**：必须在样机上取得串口、逻辑分析仪、示波器、音频、文件或交互证据。
 
 ## 2. 系统连接总览
@@ -29,8 +29,8 @@ USB-C ─ CH340K ─ UART0 / 自动下载 ─┐
         │                          │
         ├──────── I²S ─────────────┼─ ES7210 双麦+播放参考 / ES8311 播放
         │                          │                    └─ HT8691R ─ Speaker
-        ├──────── LCD SPI ─────────┼─ ST7789 200×320（CS/DC/RST/BL 经 PCA9557）
-        ├──────── SDSPI ───────────┼─ TF Card
+        ├──────── PARLIO TX ───────┼─ ST7789 200×320（CS/DC/RST/BL 经 PCA9557）
+        ├──────── SPI2 / SDSPI ────┼─ TF Card（独占唯一用户 SPI 控制器）
         ├──────── GPIO/ADC ────────┼─ DPAD / KEYA / KEYB / BAT ADC
         └──────── GPIO/RMT ────────┴─ 单 RGB / 五灯链
 
@@ -48,20 +48,20 @@ MASTER_SW ─ 物理切断整机输入电源；不是可由固件保证执行回
 | GPIO3 | I²S BCLK，输出 | 与 ES7210/ES8311 共用 | L0 已确认，待 L1 |
 | GPIO4 | ADC DPAD，输入 | ADC1_CH4；按实板中心值和窗口标定，不把多键误判为单键 | L0 已确认，待标定 |
 | GPIO5 | KEYB，输入 | 外部反相拉低；启用上拉、去抖；复位时不按键 | L0 已确认，待交互验证 |
-| GPIO6 | LCD MOSI，输出 | 真实端点为 MOSI；不得采用历史错误网名 `LCD_CLK` | L0 已确认 |
-| GPIO7 | LCD SCLK，输出 | 真实端点为 SCLK；不得采用历史错误网名 `LCD_DIN` | L0 已确认 |
+| GPIO6 | LCD MOSI，输出 | 真实端点为 MOSI；当前由 PARLIO TX 数据线驱动，避免与 TF 争用 SPI2 | L0 已实现，待 L1 |
+| GPIO7 | LCD SCLK，输出 | 真实端点为 SCLK；当前由 PARLIO TX 时钟驱动；不得采用历史错误网名 `LCD_DIN` | L0 已实现，待 L1 |
 | GPIO8 | 单颗 RGB 数据，输出 | 上电保持关闭；限亮度和占空比；验证绑带兼容性 | L0 已确认，待 L1 |
 | GPIO9 | BOOT | 下载/启动绑带；业务代码不得占用 | L0 已确认 |
-| GPIO10 | I²C0 SDA，双向 | 首板 100 kHz；总线互斥、超时和恢复由总线层统一管理 | M1 已实现基础探测，待 L1 |
-| GPIO11 | I²C0 SCL，输出 | 同上 | M1 已实现基础探测，待 L1 |
+| GPIO10 | I²C0 SDA，双向 | 首板 100 kHz；总线互斥、超时和恢复由总线层统一管理 | L0 已实现基础探测，待 L1 |
+| GPIO11 | I²C0 SCL，输出 | 同上 | L0 已实现基础探测，待 L1 |
 | GPIO12 | I²S WS/LRCK，输出 | 采播共享；格式由音频契约统一冻结 | L0 已确认，待 L1/L2 |
 | GPIO13 | ES7210 SDOUT1 → I²S DIN | R65 装配、R66 DNP；采集数据单一所有者 | L0 已确认，待 L1/L2 |
 | GPIO15 | TF CS，输出 | SDSPI；默认未选中；验证 JTAG strap 组合 | L0 已确认，待 L1 |
 | GPIO16 | UART0 TX → CH340K RXD | 启动、诊断和产测日志 | M1 已使用，待 L1 |
 | GPIO17 | UART0 RX ← CH340K TXD | 控制台/下载 | M1 已使用，待 L1 |
-| GPIO18 | TF MOSI/CMD，输出 | SDSPI，低速初始化后再提速 | L0 已确认，待 L1 |
-| GPIO19 | TF CLK，输出 | 同上 | L0 已确认，待 L1 |
-| GPIO20 | TF MISO/DAT0，输入 | 同上 | L0 已确认，待 L1 |
+| GPIO18 | TF MOSI/CMD，输出 | SPI2/SDSPI；当前候选上限 10 MHz | L0 已实现，待 L1 |
+| GPIO19 | TF CLK，输出 | 同上 | L0 已实现，待 L1 |
+| GPIO20 | TF MISO/DAT0，输入 | 同上 | L0 已实现，待 L1 |
 | GPIO21 | 五颗 RGB 串联数据，输出 | 使用 RMT 或等效硬件时序；上电关闭并限总亮度 | L0 已确认，待 L1/L2 |
 | GPIO22 | KEYA，输入 | 外部反相拉低；启用上拉、去抖 | L0 已确认，待交互验证 |
 | GPIO23 | PA_EN，输出 | 播放链稳定后开 PA；停播时先关 PA，再停 codec/时钟 | L0 已确认，待爆音验证 |
@@ -104,8 +104,10 @@ I²C0 使用 GPIO10 SDA、GPIO11 SCL，3.3 V 上拉，首板从 100 kHz 开始�
 ### 5.1 ST7789 显示
 
 - 型号：H0160S002 V1，ST7789，200×320，非触控；VDD/IOVCC 均为 3.3 V；
-- SPI 数据：GPIO6 MOSI、GPIO7 SCLK；CS/DC/RST/BL 由 PCA9557 控制；TE 未连接；
-- 固件顺序：PCA9557 安全态 → LCD 复位 → SPI/面板初始化 → 首帧完成 → 最后打开背光；
+- 面板串行数据：GPIO6 MOSI、GPIO7 SCLK；CS/DC/RST/BL 由 PCA9557 控制；TE 未连接；
+- ESP32-C6 只有一个应用可用 SPI 控制器，且 TF 使用另一组引脚，因此当前 L0 实现以 PARLIO TX 产生 LCD 串行时序，SPI2 专供 TF；
+- 固件顺序：PCA9557 安全态 → LCD 复位 → PARLIO/面板初始化 → 首帧完成 → 最后打开背光；
+- 当前候选时钟 10 MHz；方向、偏移、色序和 PARLIO 时序必须由 L1/L2 证据确认；
 - 显存必须采用有界分块/行缓冲，不能假设 PSRAM 或全屏双缓冲；
 - L1/L2 必须验证方向、颜色格式、刷新撕裂、低电量亮度和批次亮度。
 
@@ -138,6 +140,7 @@ ESP32-C6 GPIO1/I²S TX ─ ES8311 ─ HT8691R ─ 8 Ω / 1 W Speaker
 固件契约：
 
 - I²S RX 只能有一个底层所有者；AI 与本地录音在采集适配层分流，禁止两个任务同时读取硬件；
+- 当前 L0 候选由 `BoxAudioCodec` 使用 I²C0，ES7210 选择 MIC1+MIC3 并声明播放参考输入；该通道映射必须以原始 PCM 实测为准；
 - TF 写入不得阻塞音频实时路径；队列必须有界并定义溢出、停录和文件恢复策略；
 - codec 初始化、采样率、位宽、slot 和通道映射必须作为一个版本化契约冻结；
 - ES7210 CH3 播放参考是否可满足算法需求，必须用原始 PCM 和回放/录音对齐证据确认；
@@ -149,8 +152,10 @@ ESP32-C6 GPIO1/I²S TX ─ ES8311 ─ HT8691R ─ 8 Ω / 1 W Speaker
 ### 7.1 TF / SDSPI
 
 - GPIO18 MOSI/CMD、GPIO19 CLK、GPIO20 MISO/DAT0、GPIO15 CS；DAT1/DAT2 未使用；
+- 当前 L0 实现独占 SPI2、候选 10 MHz，挂载点 `/sdcard`，挂载失败不自动格式化；
 - 无 card-detect，引导时挂载失败不得阻塞主功能或形成重启循环；
-- 采用低速初始化、受控提速、周期性有界探测、流式写入和断电后文件恢复；
+- 录音采用容量 12 的固定队列和独立写卡任务；丢块、写失败或停止超时均拒绝正式提交；
+- 采用 `.part`、checkpoint、`fsync`、原子改名和启动恢复；
 - L1/L2 覆盖无卡、插拔、满卡、坏卡、慢卡、掉电和长录音。
 
 ### 7.2 NFC / PN532

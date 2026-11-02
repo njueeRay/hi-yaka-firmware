@@ -39,7 +39,7 @@ void RuntimeAdapter::Initialize() {
     ports.display = this;
     ports.input = this;
     ports.audio = this;
-    ports.storage = BoardRecordingPort();
+    ports.storage = this;
     ports.network = this;
     ports.nfc = this;
     ports.imu = this;
@@ -119,6 +119,7 @@ bool RuntimeAdapter::StartRecordingCapture() {
     }
     xQueueReset(recording_queue_);
     dropped_blocks_.store(0);
+    recording_fault_.store(false);
     recording_active_.store(true);
     Application::GetInstance().GetAudioService().EnableLocalRecording(true);
     return true;
@@ -131,6 +132,9 @@ void RuntimeAdapter::StopRecordingCapture() {
     while ((uxQueueMessagesWaiting(recording_queue_) != 0 || writer_busy_.load()) &&
            esp_timer_get_time() < deadline) {
         vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    if (uxQueueMessagesWaiting(recording_queue_) != 0 || writer_busy_.load()) {
+        recording_fault_.store(true);
     }
     ESP_LOGI(kTag, "recording capture stopped: dropped_blocks=%lu queued=%u",
              static_cast<unsigned long>(dropped_blocks_.load()),
@@ -152,6 +156,7 @@ void RuntimeAdapter::CapturePcm(const int16_t* samples, std::size_t sample_count
         }
         if (xQueueSend(recording_queue_, &block, 0) != pdTRUE) {
             ++dropped_blocks_;
+            recording_fault_.store(true);
             break;
         }
     }
@@ -173,8 +178,50 @@ void RuntimeAdapter::RunWriter() {
             !port->AppendAudio(reinterpret_cast<const uint8_t*>(block.samples),
                                block.sample_count * sizeof(int16_t))) {
             ++dropped_blocks_;
+            recording_fault_.store(true);
         }
         writer_busy_.store(false);
+    }
+}
+
+bool RuntimeAdapter::OpenRecording() {
+    auto* port = BoardRecordingPort();
+    if (port == nullptr) {
+        return false;
+    }
+    recording_fault_.store(false);
+    dropped_blocks_.store(0);
+    return port->OpenRecording();
+}
+
+bool RuntimeAdapter::CommitRecording() {
+    auto* port = BoardRecordingPort();
+    const bool drained = recording_queue_ != nullptr &&
+                         uxQueueMessagesWaiting(recording_queue_) == 0 &&
+                         !writer_busy_.load() && !recording_active_.load();
+    if (port == nullptr || !drained || recording_fault_.load() ||
+        dropped_blocks_.load() != 0) {
+        if (port != nullptr) {
+            port->AbortRecording();
+        }
+        ESP_LOGE(kTag,
+                 "recording commit rejected: drained=%d fault=%d dropped_blocks=%lu",
+                 drained, recording_fault_.load(),
+                 static_cast<unsigned long>(dropped_blocks_.load()));
+        return false;
+    }
+    return port->CommitRecording();
+}
+
+void RuntimeAdapter::AbortRecording() {
+    recording_active_.store(false);
+    Application::GetInstance().GetAudioService().EnableLocalRecording(false);
+    if (recording_queue_ != nullptr) {
+        xQueueReset(recording_queue_);
+    }
+    auto* port = BoardRecordingPort();
+    if (port != nullptr) {
+        port->AbortRecording();
     }
 }
 

@@ -35,6 +35,7 @@
 | 产品 | [产品规格与使用手册](product/PRODUCT_DATA_AND_USER_MANUAL.md) | 当前可用能力、操作和限制 |
 | 阶段 | [M1 基线](yaka/m1-baseline.md) | 当前最小板级启动范围 |
 | 验证 | [首板验证与证据包](bringup/README.md) | 限流上电、基础 bring-up、模块矩阵、M1–M7 证据映射和记录工具 |
+| 验证 | [实板前适配状态与首板启用顺序](bringup/PREBOARD_ADAPTER_STATUS.md) | M2–M5 已实现的 L0 适配、资源决策、分模块开关和首板逐项启用顺序 |
 | 技术调研 | [Velxio 前置仿真评估](research/VELXIO_SIMULATION_EVALUATION.md) | C6 仿真覆盖、限制、接入方式和限时 spike 判据 |
 
 ## 飞书协作入口
