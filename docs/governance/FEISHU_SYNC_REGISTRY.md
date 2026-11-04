@@ -13,7 +13,7 @@
 | `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 HiYaKa 项目总览与文档导航](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 44 | 顶层唯一入口；当前阶段、U11/BOOST `NO-GO`、L7 隔离边界、M2–M6 L0 与受控恢复顺序已回读 |
 | `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 53 | 完整产品 PRD v0.4；现行产品/系列语义统一为 HiYaKa；OTA 已对齐 MVP Must 与验收矩阵；位于 `01 产品与使用` |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [02 产品规格与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 5 | 现行产品语义统一为 HiYaKa；位于 `01 产品与使用` |
-| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 157 | M1 已对齐 L7 拆除后的受控复测边界；M6 标记 PN532/QMI8658A L0 驱动完成；数字音频 WAV 留样与当前结论已回读 |
+| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 171 | M1/M6/WAV 状态已回读；架构 v1.6 的 Markdown、draw.io、四页 PDF 与四页正文图已追加并回读 |
 | `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 90 | 页首阶段与单一周日志已对齐 L7 隔离、全外设 L0 驱动、WAV 留样、CI 和后续受控烧录 |
 | `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 31 | GPIO23 当前隔离边界、TF WAV、PN532 与 QMI8658A 驱动契约已同步；PA 继续硬禁用 |
 | `docs/hardware/HIYAKA_U11_THERMAL_INCIDENT_AND_RECOVERY.md` | [04 U11 异常发热失效复盘与现板恢复方案](https://scnlb1lk96sb.feishu.cn/docx/XoLCdhpQqoQjjDxHEhyciFfxnJe) | `XoLCdhpQqoQjjDxHEhyciFfxnJe` | 8 | `HIYAKA-HW-INC-001` 根因保留；新增 L7 拆除后的现场观察、开发隔离条件与发布决定 |
@@ -52,6 +52,8 @@
 2026-11-04 建立 `HIYAKA-HW-INC-001`：两块样机在 U11/BOOST 支路复现快速异常发热；确认 GPIO23/PA_EN 复位弱上拉与错误 L7 精确料号形成 P0 失效链。新增飞书原生专项复盘 revision 2；硬件主文档 revision 88、固件 PRD revision 153、接口表 revision 25、测试发布页 revision 19 已完成增量同步、旧状态定点修正和回读。当前未返修样机、直接烧录、扬声器播放和下一版制造均为 `NO-GO`；拆除 U11 或完成等效物理隔离后，才能从限流 M1 重新建立 L1 证据。专项 Markdown SHA-256：`040d147e9fadb9d2a60b7747e8150331f0990a54fbe42e0a784f8a376790efe1`。
 
 2026-11-04 完成首板风险遏制与全外设 L0 增量同步：当前开发样机拆除 L7 后不再快速升温，`HIYAKA-HW-INC-001` 根因和原始 `FAIL` 证据不覆盖，非功放 M1 调整为受控 `CONDITIONAL GO`。PN532/QMI8658A 已从地址探测升级为完整 L0 业务驱动，实验室构建新增麦克风和解码输出 WAV；PR #15 的板级/主机合同、产品核心及 20 个代表性板型矩阵全部通过。固件 PRD revision 157、硬件主文档 revision 90、接口表 revision 31、专项复盘 revision 8、项目总览 revision 44、Owner 决策台账 revision 17 均已更新并回读；操作者离场期间 MASTER OFF，功放播放和下一版制造继续 `NO-GO`。
+
+同日追加架构 v1.6：将 M2–M6 L0、PN532/QMI8658A、数字音频 WAV、L7/PA 禁用边界和 `aliyun_raynode` 命名写回唯一 draw.io 源，并重新检查四页统一颜色/线型图例。旧 v1.5 附件不覆盖；v1.6 的 Markdown、draw.io、PDF 和四页正文图追加到固件 PRD，回读到 revision 171。
 
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）；当前公开固件快照：`ChatChatTech/yaka@0489e83`（2026-11-02）。
 
@@ -97,6 +99,13 @@
 | `docs/yaka/diagrams/yaka-firmware-architecture-page-2.drawio.png`（v1.5） | 01 固件 PRD 与里程碑 | `76048a919cf033844c7561ad6c233eab568232834ce9669389c73446ecad1810` | `Ys2dbYe7XoACaKx3WEMcB6fNnhf` | 当前正文图片，caption 已回读 |
 | `docs/yaka/diagrams/yaka-firmware-architecture-page-3.drawio.png`（v1.5） | 01 固件 PRD 与里程碑 | `c2a9bad2720212d538873272fe5d5cc04b36f3b26de2825b89014ea648e76d49` | `GqLhbz5Rsos2uVx5jmec2dJmnEb` | 当前正文图片，caption 已回读 |
 | `docs/yaka/diagrams/yaka-firmware-architecture-page-4.drawio.png`（v1.5） | 01 固件 PRD 与里程碑 | `664bfb8ae62b5b0698f140501de80d194aad7897d6267bd2c0ada59ed93fdc04` | `JxX4bAZJWoJgMSxl1seckSiCnE4` | 当前正文图片，caption 已回读 |
+| `docs/yaka/firmware-architecture.md`（v1.6） | 01 固件 PRD 与里程碑 | `0c891ca3ec1a7d2cbf1727be2c5f40172ecfbec1dc22aa95b39664a20add386c` | `CdW8bHMwCopmbjxFLcichavcnGf` | 2026-11-04 已追加并回读，当前版本 |
+| `docs/yaka/diagrams/yaka-firmware-architecture.drawio`（v1.6 编辑源） | 01 固件 PRD 与里程碑 | `db673d702e3f9b7241eb12838bb7bccba23db9fa14ff579d53327b7f97a4047b` | `JOBUbJXcMoCPgsxVfr3cHZqynAf` | 2026-11-04 已追加并回读，当前编辑源 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-v1.6.pdf`（四页） | 01 固件 PRD 与里程碑 | `85ae335cc56ec9d9902d0f9bd74bb289a1dd6a49faf92b0bbcd34b01b60472d9` | `K2tubv3AFoCkgvxShnec5bgonDi` | 2026-11-04 已追加并回读，当前评审版 |
+| `docs/yaka/diagrams/yaka-firmware-architecture.drawio.png`（v1.6 第 1 页） | 01 固件 PRD 与里程碑 | `ca12508b73fa5b8bffe7430e5b663f34cc1a100a6578ef6ca472611035192ca4` | `T1eAbkdbpoqOVXxlA36cOd4Knsb` | 当前正文图片，caption 已回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-page-2.drawio.png`（v1.6） | 01 固件 PRD 与里程碑 | `76048a919cf033844c7561ad6c233eab568232834ce9669389c73446ecad1810` | `ZUaeby5I4okizYxSwLJcXCVvnwd` | 当前正文图片，caption 已回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-page-3.drawio.png`（v1.6） | 01 固件 PRD 与里程碑 | `90affa36d5e4a4566e7b049b636c5e736c9886a2bc7c799078ad12b84a22fff0` | `MTz6baqq8orjhzxYnJDcxOrjnfe` | 当前正文图片，caption 已回读 |
+| `docs/yaka/diagrams/yaka-firmware-architecture-page-4.drawio.png`（v1.6） | 01 固件 PRD 与里程碑 | `ac6b281aef287f318b3cff3d418f323122b8bf6ff451ac22ed3224dafc7ccb2d` | `MdnVbdL5ZopnbPxySOPcBGiVnrh` | 当前正文图片，caption 已回读 |
 | `docs/bringup/README.md` | 01 测试、问题与发布记录 | `4545be34fcc32da155f05b1f85cb388b9da822d91ac75c2e9225e2a6b0133a66` | `LpOibBygzo7pQixiIZkcPjTTn3d` | PH5 首板验证入口，已上传并回读 |
 | `docs/bringup/FIRST_BOARD_VALIDATION.md` | 01 测试、问题与发布记录 | `88f61a7c019d03d78bf7868b74e665d09228913ef2d9a7d63954d794a691ef22` | `Dxz0b1rfkoBlKyxdvuAcGaLYnke` | PH5 上电与基础验证手册，已上传并回读 |
 | `docs/bringup/MODULE_TEST_MATRIX.md` | 01 测试、问题与发布记录 | `052ab98e1c26555b2eb3701070e78ce9d1db89efc12fb16519b3a291112c3cdd` | `LqO7bSkR5oh2ITxEsw9cYjCEnsh` | PH5 模块测试矩阵，已上传并回读 |
