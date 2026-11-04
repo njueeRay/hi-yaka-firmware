@@ -1,6 +1,6 @@
 # HiYaKa 飞书文档同步登记
 
-> 最后更新：2026-11-04
+> 最后更新：2026-11-05
 > 飞书目录：[HiYaKa](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)
 > 原则：Git Markdown 保存可审计的工程事实源；飞书保存协作副本、跨文档索引和附件入口。
 
@@ -13,9 +13,9 @@
 | `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 HiYaKa 项目总览与文档导航](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 44 | 顶层唯一入口；当前阶段、U11/BOOST `NO-GO`、L7 隔离边界、M2–M6 L0 与受控恢复顺序已回读 |
 | `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 53 | 完整产品 PRD v0.4；现行产品/系列语义统一为 HiYaKa；OTA 已对齐 MVP Must 与验收矩阵；位于 `01 产品与使用` |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [02 产品规格与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 5 | 现行产品语义统一为 HiYaKa；位于 `01 产品与使用` |
-| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 188 | M2/M3/M4/M6 实板状态、未完成项和验证顺序已局部修正并回读；双声道麦克风仍全零的结果已补充；架构 v1.6 附件保留 |
-| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 103 | 本周实板故障归入同一周日志；含双声道复测的最新专项附件已上传并在 3.1 索引，旧附件保留追溯 |
-| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 36 | IO0 开漏与背光缺上拉、PN532 NACK 且 VREF/复位约 3 V、IMU 地址 0x6B 已回读；PA 继续硬禁用 |
+| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 194 | M6 将 IMU 基础读取与轴向/稳定性验收拆开；LCD/NFC/麦克风实板缺口、无屏幕对照和芯片状态已回读；架构 v1.6 附件保留 |
+| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 122 | 本周实板故障仍归入同一周日志；最新专项诊断与接口 Markdown 已追加为附件并在 3.1/3.2 索引，旧附件保留追溯 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 46 | ACT_B/PWR_B 实板映射、IMU 基础数据、GPIO13 无翻转、无屏幕 NFC 对照及 R63/R64/R65 阻值已回读；PA 继续硬禁用 |
 | `docs/hardware/HIYAKA_U11_THERMAL_INCIDENT_AND_RECOVERY.md` | [04 U11 异常发热失效复盘与现板恢复方案](https://scnlb1lk96sb.feishu.cn/docx/XoLCdhpQqoQjjDxHEhyciFfxnJe) | `XoLCdhpQqoQjjDxHEhyciFfxnJe` | 8 | `HIYAKA-HW-INC-001` 根因保留；新增 L7 拆除后的现场观察、开发隔离条件与发布决定 |
 | `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 15 | 已回读执行环境边界：Windows 只做烧录/串口/实板调试，构建与测试统一在 `aliyun_raynode` 或 GitHub Actions/Linux |
 | 仓库、上游与技术决策 | [02 决策与版本记录](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 14 | 保存正式 ADR 与版本影响 |
@@ -61,13 +61,17 @@
 
 同日追加双声道实板对照：提交 `a8edac9` 的实验室固件经 `aliyun_raynode` ESP-IDF 6.1 构建，GitHub Actions 板级契约、产品核心和板型矩阵均成功；COM5 首次高速写入中断，降为 115200 baud 后写入与哈希校验成功。冷启动日志确认 I²S RX 双声道，原始 DMA 和 TF WAV 均全零；全地址扫描仅见另外四颗 I²C 器件。飞书固件 PRD revision 188、硬件主文档 revision 103 已局部同步并回读；最新版专项诊断附件已追加并重新索引。
 
+2026-11-05 首板诊断增量：活体网表和实板 ADC 事件纠正 `PWR_B` 与 `ACT_B`；后者红灯、WAV 启停复验通过。MCU 侧三路 I²S 时钟活动、GPIO13/SDOUT1 无翻转；ES7210 状态为正常、双麦选通且未静音，音频数据仍全零。无屏幕构建的 240 秒对照中 PN532 仍 NACK，未见 PCA9557 间歇重试；有屏幕构建仍见重试，因条件不同不直接归因。操作者断电实测 R63/R64/R65 约 0/0/51 Ω。固件 PRD revision 194、硬件主文档 revision 122、原生接口表 revision 46 已定点同步并回读；最新接口和专项 Markdown 附件已追加并在 3.1/3.2 索引。
+
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）；当前公开固件快照：`ChatChatTech/yaka@0489e83`（2026-11-02）。
 
 ## 2. 附件登记
 
 | 附件 | 目标文档 | SHA-256 | 飞书文件 Token | 状态 |
 |---|---|---|---|---|
-| `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（含双声道复测，当前版） | 02 硬件主文档 | `56b1f312dcf53d48735054aa616f5058c7b2ed1d3477ff5f360f279a5c6d1d89` | `U55Vb5WpPox8e3xdz16cOb59nEe` | 2026-11-04 上传并在 3.1 索引；当前拆 L7 的开发样机 |
+| `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（R63/R64/R65 实测现行版） | 02 硬件主文档 | `63d899e3fd8540a65a33a156891171177696b6406c86b77bba928f8b2fe408e7` | `BFtYbHkufoa34gxmOFZcRGvTnyg` | 2026-11-05 已上传并在 3.1 索引；旧附件保留追溯 |
+| `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（引脚活动、芯片状态、无屏幕对照，R65 实测前） | 02 硬件主文档 | `e012635d49485d7197aa7468e006ddb6d273d1b336ea2dd96684a30389bd0829` | `UmXBbuci6oIkcHxKQeocKEwinKf` | 当日中间版，保留追溯 |
+| `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（含双声道复测，历史版） | 02 硬件主文档 | `56b1f312dcf53d48735054aa616f5058c7b2ed1d3477ff5f360f279a5c6d1d89` | `U55Vb5WpPox8e3xdz16cOb59nEe` | 2026-11-04 上传并在 3.1 曾索引，保留追溯 |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（早期首板诊断） | 02 硬件主文档 | `3ac0df0247699d7354cb2b24126b3379ef2adc367b1ff707f0f42ca571b4cd0c` | `Nxstb4VVkoQie3xb8pSccutPn08` | 历史附件，保留追溯 |
 | `docs/yaka/firmware-architecture.md`（历史 v1.0） | 01 固件 PRD 与里程碑 | `7d8f7ae0b8880c075e05da9f75afced80deccec991d9a8abca8d1f9a9cc72598` | `QSQRbd2TWo07WPxn4pncxqE0n3f` | 历史附件，保留追溯 |
 | `docs/yaka/firmware-architecture.md`（历史 v1.1） | 01 固件 PRD 与里程碑 | `c58d8b1a469a3eb2762a11f0005f3a7f2dada1a8395ef34031d99ba758222ead` | `KiMMbiCSaoMr7HxyYYbcEFx7nv0` | 历史附件，保留追溯 |
@@ -127,7 +131,10 @@
 | `docs/hardware/attachments/yaka-3.0-pcb-comprehensive-audit-and-eco-spec.md`（HiYaKa 命名对齐版） | 02 硬件主文档 | `61a3aa814fd473b3254afcbe2daeaf7c11f8a2cfe730692e814472b84395cdfc` | `QT8Vbd585oCSSJxsBK1cvUjkn7c` | 2026-11-02 已上传并回读，当前版本 |
 | `docs/hardware/attachments/yaka-3.0-prefreeze-release-manufacturing-and-sourcing-checklist.md`（HiYaKa 命名对齐版） | 02 硬件主文档 | `a64c8ee05cac9f4f414f42f41c8ed362fe688e904babe2f9d06ac64aea95e318` | `K7tXbxTHBoiuSFx6Gijck9k5njf` | 2026-11-02 已上传并回读，当前版本 |
 | `docs/hardware/attachments/yaka-3.0-procurement-and-consignment-list.csv` | 02 硬件主文档 | `10a8a83fbe50177ba737962a3b2a028e0196384ff88f6b26f9ace4e475a4fc46` | `XeMxbTcEZoqMUuxkN8jcMxHnngz` | 已上传 |
-| `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | 02 硬件主文档 | `7054463d187430309db1d0a751759d2e0193af359f53a625600fa16aa07913ea` | `DRy0bQ6dIobLjOx5WO6cVcpsnoc` | 已上传并在 3.2 索引 03 原生文档 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md`（2026-11-05 现行附件） | 02 硬件主文档 | `be4d3b9185f75a1948abbc95b2d0bd324215daea890c3b83c0b7f4db80fd97ab` | `TPFub69t6owUqdxNRUmch6WEnEa` | 已上传并在 3.2 索引 03 原生文档和本附件 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md`（当日中间版） | 02 硬件主文档 | `435f6fe763633265419066d43c7c87c77dd4d7d66680cfd80d38f5f455a74713` | `QYFDbZqqLoCanwxOggIcr1ornld` | 中间版，保留追溯 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md`（当日 ACT_B/IMU 增量） | 02 硬件主文档 | `a6be2a8cb217fa2fa96a11508c9c12a15d48aeee9c1f679cfc4ea9c3a7b0ea54` | `Ra8qb5Z01o7oDGx9FTuc8A23n17` | 中间版，保留追溯 |
+| `docs/hardware/HARDWARE_MODULE_INTERFACES.md`（历史版） | 02 硬件主文档 | `7054463d187430309db1d0a751759d2e0193af359f53a625600fa16aa07913ea` | `DRy0bQ6dIobLjOx5WO6cVcpsnoc` | 历史附件，保留追溯 |
 | `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | 01 开发协作与文档维护规范 | `2b6970f4a8aa3102a443f5c0fc9b5e0bff8c04b197084d3cfd2f646961ac2d70` | `IaDebP4yBoqK0ux6Mtkc4oqhnUc` | 已上传 |
 | `docs/research/VELXIO_SIMULATION_EVALUATION.md` | 04 外部参考与技术调研 | `79614967175b25c04e50eb8ac4707cd07a8cddd52c69d9b52ab81c23b672a986` | `ZsLYbpRNlomJiZx9XVAcJjCUnHe` | 已上传并补充原生摘要 |
 
