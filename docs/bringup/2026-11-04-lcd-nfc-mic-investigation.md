@@ -53,6 +53,21 @@ MCU 侧三路时钟已由 PCNT 证实活动，SDOUT1/GPIO13 无翻转。下一�
 
 现场目前只有万用表。操作者按要求在 **MASTER OFF、USB/电池完全断开** 后跨 R65 两端测得约 **51 Ω**，R63/R64 两端各约 **0 Ω**，均与活体原理图和器件值一致，三颗电阻本体明显开路的假设被削弱；不再逐颗追查这组电阻。跨件读数不能证明 U12 到 R65 或 R65 到 MCU 焊盘均导通，也不能代替复电时的 U12 供电测量。**万用表直流读数不能替代 512 kHz I²S 数据波形判断，也不能据约 1.6 V 均值宣称有正确数字音频。**后续由能稳定接触 0402/QFN 的维修台测 U12 焊盘时钟、供电和 SDOUT1/R65 两侧波形；当前样机保持断电，待准备好测量条件再恢复验证。
 
+### 已验收旧板交叉对照（2026-11-05）
+
+只读核对活体 EasyEDA `YaKa v2.0` 工程 `61d2076a056e4cb4b9c5b734f0f793e9` 的 `Codec` 页与 BOM，并与当前工程 `8f58125ad0d64436afbfeeeb03d3b159` 的 `CODEC` 页、PCB 焊盘网及 BOM 对比。旧固件来源为 [ChatChatTech/yaka-firmware `540c9ce`](https://github.com/ChatChatTech/yaka-firmware/tree/540c9ceaeacfebdf29a1fa3eb974f97b885f05d3)；用户说明旧板整体已验收，但现存源码和 EDA 不能单独证明旧板每项音频测试的原始波形或测量条件。
+
+| 对照项 | 旧板 | 当前 HiYaKa | 解释 |
+|---|---|---|---|
+| 采集与麦克风 | U7 ES7210、两颗 ZTS6216 | U12 ES7210、两颗 ZTS6216 | 料号相同，不能以“换了 ADC/麦克风型号”解释全零 |
+| 数据输出 | U7.11/SDOUT1 → R48=51 Ω → S3 GPIO12；U7.12 → R49=0 Ω（NC） | U12.11/SDOUT1 → R65=51 Ω → C6 GPIO13；U12.12 → R66（DNP） | 功能拓扑相同，主控引脚与芯片系列不同；当前 PCB 焊盘网络与原理图一致，但未做实板端到端导通检查 |
+| 偏置与供电 | MICBIAS12 经 R31/R34=0 Ω 到两颗麦，ADC 数字/模拟供电经 R40/R44=0 Ω | MICBIAS12 经 R42/R45=0 Ω 到两颗麦，ADC 数字/模拟供电经 R63/R64=0 Ω | 两版拓扑相近；当前电阻本体读数符合设计值，不能替代各供电脚上电实测 |
+| 固件音频格式 | 24 kHz、四槽 16 位 TDM、选择 MIC1–4，I²S S3 主机，`esp_codec_dev ~1.4.0` / ESP-IDF 5.4.2 | 当前实验室对照为 16 kHz、双槽 16 位标准 I²S、选择 MIC1/2，C6 主机，`esp_codec_dev ~1.6.2` / ESP-IDF 6.1；此前三路 TDM 也全零 | 不能把旧板成功直接归因于某个寄存器值；16 kHz 位于 ES7210 数据手册规定的 8–48 kHz 单速范围 |
+
+**优先核验的差异：**ESP32-C6 GPIO12/13 默认兼作 USB Serial/JTAG，当前分别承担 WS 和 DIN；旧 S3 的对应 GPIO13/12 不等同于 C6 的引脚复用条件。官方 IDF 说明外设驱动应重新配置这些脚，因此“USB 默认功能一定抢占了数据线”只是待测假设。当前 GPIO12 的 WS 已在 MCU 侧计到约 16 kHz，GPIO13 无跳变。下一版实验室固件已加入录音时 GPIO12/13 的只读路由转储及 GPIO13 电平记录；**尚未构建、烧录或实测**，不能把它当作问题已解决。
+
+另一个需要对照的点是 C6 同一 I²S 控制器上的 TX/RX 全双工帧长。官方 IDF 要求配对通道具有相同的每帧总位数；当前双声道标准模式的 TX/RX 均为 2×16 位，PCNT 实测 BCLK/WS=512 kHz/16 kHz，与 32 位帧相符，但仍全零。因此旧版“四槽 TDM”与当前版本的格式差异不能单独解释双声道实验的全零。若 GPIO13 路由正确，接下来的判别实验仍是 U12 时钟、SDOUT1 与 R65 两侧的同步波形。实验室双声道配置目前把第二只实体麦作为 `input_reference=true` 向上层声明，不能把这一路解释为播放参考；这属于上层语义问题，不解释原始 I²S 全零。
+
 ## 参考
 
 - [NXP PN532/C1 数据手册](https://www.nxp.com/docs/en/nxp/data-sheets/PN532_C1.pdf)，§8.3 宿主接口、§8.4.1 电源；
@@ -60,4 +75,6 @@ MCU 侧三路时钟已由 PCNT 证实活动，SDOUT1/GPIO13 无翻转。下一�
 - [Vishay Si2302CDS 数据手册](https://www.vishay.com/docs/68645/si2302cds.pdf)，2.5 V 栅压下的导通电阻；
 - [Everest ES7210 数据手册](https://files.waveshare.com/wiki/common/ES7210_DS.pdf)，寄存器 `0x01/0x11/0x12/0x41–0x4C`；
 - [Espressif ESP32-C6 I²S 驱动文档](https://docs.espressif.com/projects/esp-idf/en/v6.0.3/esp32c6/api-reference/peripherals/i2s.html)，全双工共享 BCLK/WS；
+- [Espressif ESP32-C6 GPIO 文档](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-reference/peripherals/gpio.html)，GPIO12/13 默认 USB Serial/JTAG 复用；
+- [Espressif ESP-IDF 6.1 I²S 文档](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-reference/peripherals/i2s.html)，配对 TX/RX 的帧时序条件；
 - 当前工程 `managed_components/espressif__esp_codec_dev/device/es7210/es7210.c` 与 `managed_components/jef-sure__pn532/src/pn532-bus-i2c.c`。

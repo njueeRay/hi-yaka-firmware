@@ -552,6 +552,11 @@ private:
                     LogI2sPadEdges("BCLK", YAKA_AUDIO_BCLK_GPIO, 10000);
                     LogI2sPadEdges("WS", YAKA_AUDIO_WS_GPIO, 20000);
                     LogI2sPadEdges("SDOUT1", YAKA_AUDIO_DIN_GPIO, 20000);
+                    ESP_LOGI(TAG, "BRINGUP I2S GPIO13 input level=%d; GPIO12/13 routing follows",
+                             gpio_get_level(YAKA_AUDIO_DIN_GPIO));
+                    gpio_dump_io_configuration(stdout,
+                                               (1ULL << YAKA_AUDIO_WS_GPIO) |
+                                               (1ULL << YAKA_AUDIO_DIN_GPIO));
                     ESP_LOGI(TAG, "BRINGUP MIC RECORD START: %s channels=%u; R42/R45 measurement valid while red LEDs are on",
                              path, static_cast<unsigned>(channels));
                     constexpr std::size_t kFramesPerChunk = 320;
