@@ -418,7 +418,10 @@ private:
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
             YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS,
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
-            false, 24.0f, -1, 0.0f, YAKA_I2C_PORT,
+            // Capture both ES7210 slots in the lab image. A single selected
+            // slot makes esp_codec_dev reconfigure the RX interface to mono,
+            // which hides whether MIC2 appears in the other physical slot.
+            true, 24.0f, 1, 24.0f, YAKA_I2C_PORT,
             ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true);
 #else
             true, 24.0f, 2, 0.0f, YAKA_I2C_PORT,
