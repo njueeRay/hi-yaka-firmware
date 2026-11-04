@@ -174,10 +174,16 @@ class HiYaKaBoardContractTest(unittest.TestCase):
 
     def test_lab_audio_diagnostics_are_bounded_and_replayable(self):
         board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        feedback = (BOARD_DIR / "hi_yaka_feedback.cc").read_text(encoding="utf-8")
         writer = (BOARD_DIR / "hi_yaka_wav_writer.cc").read_text(encoding="utf-8")
-        self.assertIn("microphone-capture.wav", board)
+        self.assertIn("key-b-%03lu.wav", board)
+        self.assertIn("PhysicalKey::kSecondary", board)
+        self.assertIn("lab_record_stop_requested_.store(true)", board)
+        self.assertIn("kMaximumSeconds = 180", board)
+        self.assertIn("SetLabRecordingIndicator(true)", board)
+        self.assertIn("SetLabRecordingIndicator(false)", board)
+        self.assertIn("lab_recording_indicator_override_", feedback)
         self.assertIn("decoded-output.wav", board)
-        self.assertIn("kCaptureSeconds = 5", board)
         self.assertIn("kMaximumSeconds = 30", board)
         self.assertIn('std::memcpy(header, "RIFF", 4)', writer)
         self.assertIn('std::memcpy(header + 8, "WAVEfmt ", 8)', writer)
