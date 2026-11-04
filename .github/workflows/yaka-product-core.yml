@@ -71,6 +71,9 @@ jobs:
             --name hi-yaka-lab \
             --language zh-CN \
             --wake-word disabled
+          mkdir -p artifacts
+          cp build/xiaozhi.bin artifacts/hi-yaka-lab.bin
+          cp sdkconfig artifacts/hi-yaka-lab.sdkconfig
       - name: Build HiYaKa with ESP-IDF 6.1
         shell: bash
         run: |
@@ -122,6 +125,8 @@ jobs:
             build/hi-yaka-resource-report.json
             build/hi-yaka-provenance.json
             build/SHA256SUMS
+            artifacts/hi-yaka-lab.bin
+            artifacts/hi-yaka-lab.sdkconfig
             sdkconfig
             partitions/hi-yaka-16m.csv
           if-no-files-found: error

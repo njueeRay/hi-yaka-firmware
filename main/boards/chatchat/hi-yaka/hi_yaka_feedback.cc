@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 constexpr char kTag[] = "HiYaKaFeedback";
@@ -92,6 +94,20 @@ void HiYaKaFeedback::PulseMotor(uint32_t duration_ms) {
     if (expander_.SetOutputBit(YAKA_PCA9557_MOTOR_BIT, true) == ESP_OK) {
         esp_timer_start_once(motor_timer_, duration_ms * 1000U);
     }
+}
+
+void HiYaKaFeedback::RunBringupSelfTest() {
+    ESP_LOGI(kTag, "bring-up self-test: RGB red -> green -> blue, then motor 80 ms");
+    SetColor(8, 0, 0);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    SetColor(0, 8, 0);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    SetColor(0, 0, 8);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    SetColor(0, 0, 0);
+    PulseMotor(80);
+    vTaskDelay(pdMS_TO_TICKS(180));
+    ESP_LOGI(kTag, "bring-up self-test complete; feedback returned to safe-off");
 }
 
 void HiYaKaFeedback::OnStateChanged() {

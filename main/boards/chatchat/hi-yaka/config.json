@@ -32,7 +32,7 @@
                 "CONFIG_HI_YAKA_ENABLE_AUDIO=y",
                 "CONFIG_HI_YAKA_ENABLE_STORAGE=y",
                 "CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y",
-                "CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME=y"
+                "CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y"
             ]
         }
     ]

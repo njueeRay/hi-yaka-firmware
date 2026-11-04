@@ -29,6 +29,9 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         lab_options = set(lab_build["sdkconfig_append"])
         self.assertIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", lab_options)
         self.assertIn("CONFIG_HI_YAKA_ENABLE_STORAGE=y", lab_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", lab_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", lab_options)
+        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME=y", lab_options)
 
     def test_build_selection_chain_is_complete(self):
         kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
@@ -82,6 +85,8 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_IDF_TARGET_ESP32C6", source)
         self.assertIn("defined(CONFIG_SPIRAM) && CONFIG_SPIRAM", source)
         self.assertIn("DummyAudioCodec", source)
+        self.assertIn("PA safety interlock active", source)
+        self.assertIn("ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false", source)
 
     def test_lcd_does_not_consume_the_only_user_spi_controller(self):
         lcd_io = (BOARD_DIR / "hi_yaka_expander_lcd_io.cc").read_text(encoding="utf-8")

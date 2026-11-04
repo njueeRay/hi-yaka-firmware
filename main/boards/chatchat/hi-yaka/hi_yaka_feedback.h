@@ -14,6 +14,7 @@ public:
     ~HiYaKaFeedback() override;
 
     esp_err_t Initialize();
+    void RunBringupSelfTest();
     void OnStateChanged() override;
     void Emit(hi_yaka::FeedbackSignal signal) override;
 

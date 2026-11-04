@@ -19,7 +19,9 @@
 #include <cstdint>
 #include <inttypes.h>
 #include <memory>
+#include <vector>
 
+#include <driver/gpio.h>
 #include <driver/i2c_master.h>
 #include <esp_err.h>
 #include <esp_flash.h>
@@ -57,6 +59,14 @@ constexpr std::array<ExpectedI2cDevice, 5> kExpectedI2cDevices = {{
     {YAKA_QMI8658A_I2C_ADDRESS, "QMI8658A"},
 }};
 
+const char* PhysicalKeyName(hi_yaka::PhysicalKey key) {
+    constexpr std::array<const char*, 8> kNames = {{
+        "UP", "DOWN", "LEFT", "RIGHT", "CONFIRM", "BACK", "KEY_A", "KEY_B",
+    }};
+    const auto index = static_cast<std::size_t>(key);
+    return index < kNames.size() ? kNames[index] : "UNKNOWN";
+}
+
 class ExpanderBacklight final : public Backlight {
 public:
     explicit ExpanderBacklight(HiYaKaPca9557& expander) : expander_(expander) {}
@@ -91,6 +101,23 @@ private:
     std::unique_ptr<hi_yaka::RecordingStore> recording_store_;
     std::unique_ptr<hi_yaka::RecordingStoragePortAdapter> recording_port_;
     bool pca_safe_state_verified_ = false;
+
+    void ForcePaDisabled() {
+        gpio_config_t config = {};
+        config.pin_bit_mask = 1ULL << YAKA_AUDIO_PA_ENABLE_GPIO;
+        config.mode = GPIO_MODE_OUTPUT;
+        config.pull_up_en = GPIO_PULLUP_DISABLE;
+        config.pull_down_en = GPIO_PULLDOWN_ENABLE;
+        config.intr_type = GPIO_INTR_DISABLE;
+        const esp_err_t result = gpio_config(&config);
+        if (result == ESP_OK) {
+            gpio_set_level(YAKA_AUDIO_PA_ENABLE_GPIO, 0);
+            ESP_LOGI(TAG, "PA safety interlock active: GPIO%d forced low",
+                     static_cast<int>(YAKA_AUDIO_PA_ENABLE_GPIO));
+        } else {
+            ESP_LOGE(TAG, "PA safety interlock failed: %s", esp_err_to_name(result));
+        }
+    }
 
     void LogPlatformBaseline() {
         uint32_t flash_id = 0;
@@ -261,8 +288,9 @@ private:
             YAKA_AUDIO_MCLK_GPIO, YAKA_AUDIO_BCLK_GPIO, YAKA_AUDIO_WS_GPIO,
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
             YAKA_ES8311_I2C_ADDRESS, YAKA_ES7210_I2C_ADDRESS, true, 24.0f, 2, 0.0f,
-            YAKA_I2C_PORT, ES7210_SEL_MIC1 | ES7210_SEL_MIC3);
-        ESP_LOGW(TAG, "audio candidate enabled: slot/gain/PA timing require L1/L2 verification");
+            YAKA_I2C_PORT, ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false);
+        ESP_LOGW(TAG,
+                 "capture-only audio candidate enabled; speaker/PA output is hard-disabled");
     }
 #endif
 
@@ -292,8 +320,8 @@ private:
 #if CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
                     hi_yaka::RuntimeAdapter::Get().OnPhysicalInput(key, gesture);
 #else
-                    ESP_LOGI(TAG, "physical key=%u gesture=%u",
-                             static_cast<unsigned>(key), static_cast<unsigned>(gesture));
+                    ESP_LOGI(TAG, "physical key=%s gesture=%s", PhysicalKeyName(key),
+                             gesture == hi_yaka::KeyGesture::kLongPress ? "LONG" : "PRESS");
 #endif
                 });
             });
@@ -331,8 +359,66 @@ private:
         }
     }
 
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    void StartBringupDiagnostics() {
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                vTaskDelay(pdMS_TO_TICKS(4000));
+                ESP_LOGI(TAG, "BRINGUP BEGIN: bounded unified peripheral diagnostics");
+
+                if (self->adc_ != nullptr) {
+                    int keys_mv = 0;
+                    int battery_divider_mv = 0;
+                    const esp_err_t keys_result =
+                        self->adc_->ReadMillivolts(YAKA_DPAD_ADC_CHANNEL, &keys_mv);
+                    const esp_err_t battery_result =
+                        self->adc_->ReadMillivolts(YAKA_BATTERY_ADC_CHANNEL,
+                                                  &battery_divider_mv);
+                    ESP_LOGI(TAG,
+                             "BRINGUP ADC idle: keys=%d mV (%s), battery-divider=%d mV (%s)",
+                             keys_mv, esp_err_to_name(keys_result), battery_divider_mv,
+                             esp_err_to_name(battery_result));
+                }
+
+                if (self->feedback_ != nullptr) {
+                    self->feedback_->RunBringupSelfTest();
+                }
+
+                if (self->audio_codec_ != nullptr) {
+                    std::vector<int16_t> samples(1600, 0);
+                    self->audio_codec_->EnableInput(true);
+                    vTaskDelay(pdMS_TO_TICKS(150));
+                    const bool captured = self->audio_codec_->InputData(samples);
+                    self->audio_codec_->EnableInput(false);
+                    int peak = 0;
+                    uint64_t energy = 0;
+                    for (const int16_t sample : samples) {
+                        const int value = sample < 0 ? -static_cast<int>(sample)
+                                                     : static_cast<int>(sample);
+                        peak = std::max(peak, value);
+                        energy += static_cast<uint64_t>(value) * value;
+                    }
+                    ESP_LOGI(TAG,
+                             "BRINGUP microphone capture: captured=%d samples=%u peak=%d mean_square=%" PRIu64,
+                             captured, static_cast<unsigned>(samples.size()), peak,
+                             energy / samples.size());
+                }
+
+                ESP_LOGI(TAG,
+                         "BRINGUP READY: press UP/DOWN/LEFT/RIGHT/CONFIRM/BACK/KEY_A/KEY_B one at a time");
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_diag", 4096, this, 4, nullptr);
+        if (created != pdPASS) {
+            ESP_LOGE(TAG, "failed to start bounded bring-up diagnostics");
+        }
+    }
+#endif
+
 public:
     HiYaKaBoard() {
+        ForcePaDisabled();
         LogPlatformBaseline();
         InitializeI2c();
         InitializePca9557SafeState();
@@ -354,6 +440,9 @@ public:
 #endif
 #if CONFIG_HI_YAKA_ENABLE_STORAGE
         InitializeStorage();
+#endif
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        StartBringupDiagnostics();
 #endif
         ESP_LOGW(TAG,
                  "pre-board candidate: enabled modules are L0 only until physical-board verification");
