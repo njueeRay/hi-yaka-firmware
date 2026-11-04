@@ -26,8 +26,13 @@
 #include <memory>
 #include <vector>
 
+#include <sdkconfig.h>
 #include <driver/gpio.h>
 #include <driver/i2c_master.h>
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+#include <driver/pulse_cnt.h>
+#include <esp_rom_sys.h>
+#endif
 #include <esp_err.h>
 #include <esp_flash.h>
 #include <esp_heap_caps.h>
@@ -38,7 +43,6 @@
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <sdkconfig.h>
 
 #define TAG "HiYaKa"
 
@@ -122,6 +126,63 @@ private:
 };
 
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+void LogI2sPadEdges(const char* signal, gpio_num_t pin, uint32_t sample_us) {
+    pcnt_unit_config_t unit_config = {};
+    unit_config.high_limit = 30000;
+    unit_config.low_limit = -1;
+    pcnt_unit_handle_t unit = nullptr;
+    pcnt_channel_handle_t channel = nullptr;
+    esp_err_t result = pcnt_new_unit(&unit_config, &unit);
+    bool enabled = false;
+    bool started = false;
+    int rising_edges = 0;
+    int64_t elapsed_us = 0;
+
+    if (result == ESP_OK) {
+        pcnt_chan_config_t channel_config = {};
+        channel_config.edge_gpio_num = pin;
+        channel_config.level_gpio_num = -1;
+        result = pcnt_new_channel(unit, &channel_config, &channel);
+    }
+    if (result == ESP_OK) {
+        result = pcnt_channel_set_edge_action(channel, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
+                                              PCNT_CHANNEL_EDGE_ACTION_HOLD);
+    }
+    if (result == ESP_OK) {
+        result = pcnt_unit_enable(unit);
+        enabled = result == ESP_OK;
+    }
+    if (result == ESP_OK) {
+        result = pcnt_unit_clear_count(unit);
+    }
+    if (result == ESP_OK) {
+        result = pcnt_unit_start(unit);
+        started = result == ESP_OK;
+    }
+    if (result == ESP_OK) {
+        const int64_t started_at = esp_timer_get_time();
+        esp_rom_delay_us(sample_us);
+        elapsed_us = esp_timer_get_time() - started_at;
+        result = pcnt_unit_get_count(unit, &rising_edges);
+    }
+
+    if (started) {
+        pcnt_unit_stop(unit);
+    }
+    if (enabled) {
+        pcnt_unit_disable(unit);
+    }
+    if (channel != nullptr) {
+        pcnt_del_channel(channel);
+    }
+    if (unit != nullptr) {
+        pcnt_del_unit(unit);
+    }
+    ESP_LOGI(TAG, "BRINGUP I2S pad edges: %s GPIO%d result=%s rising=%d elapsed_us=%lld",
+             signal, static_cast<int>(pin), esp_err_to_name(result), rising_edges,
+             static_cast<long long>(elapsed_us));
+}
+
 class HiYaKaDiagnosticAudioCodec final : public BoxAudioCodec {
 public:
     using BoxAudioCodec::BoxAudioCodec;
@@ -487,6 +548,10 @@ private:
                     self->audio_codec_->EnableInput(true);
                     vTaskDelay(pdMS_TO_TICKS(150));
                     self->audio_codec_->LogInputDiagnostics();
+                    LogI2sPadEdges("MCLK", YAKA_AUDIO_MCLK_GPIO, 1000);
+                    LogI2sPadEdges("BCLK", YAKA_AUDIO_BCLK_GPIO, 10000);
+                    LogI2sPadEdges("WS", YAKA_AUDIO_WS_GPIO, 20000);
+                    LogI2sPadEdges("SDOUT1", YAKA_AUDIO_DIN_GPIO, 20000);
                     ESP_LOGI(TAG, "BRINGUP MIC RECORD START: %s channels=%u; R42/R45 measurement valid while red LEDs are on",
                              path, static_cast<unsigned>(channels));
                     constexpr std::size_t kFramesPerChunk = 320;

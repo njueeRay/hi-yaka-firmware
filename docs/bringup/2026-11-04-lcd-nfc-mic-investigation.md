@@ -17,7 +17,7 @@
 
 2026-11-04 实验室按键版在服务器构建；应用镜像 SHA-256 `433519B51AEC5E793ACDE53E46DDC6EC9F5145F0C8B3516DBDE2A12EB40EADB8`，COM5 上以 115200 baud 写入 OTA0 的 `0x20000`，随后 `verify-flash` 比对 2,610,544 字节，摘要一致。启动日志显示实验室功能已加载、TF 挂载、扬声器 PA 禁用。旧按键映射测试中，板上 `PWR_B` 两次启停 WAV，首段 `samples=411520 peak=0 wav_closed=1`，第二段 `samples=2991360 peak=0 wav_closed=1`；RGB 和五灯阵列在录音期间红色常亮，操作者已目视确认。两次录音的原始 I²S 读取均为 `nonzero=0`。中途出现 PCA9557 写失败、I²C 总线复位失败及 LCD 写失败，记录为并发观察，尚不能证明与录音全零同因。
 
-**按键名纠错：**该实验固件最初把内部网 `KEYB/GPIO5` 当作板上 `ACT_B`，实际它来自 `PWR_B → Q7`。活体原理图导出网表显示 `ACT_B → R39 后的 ADC 梯 → GPIO4`；操作者短按 `ACT_B` 时实板 ADC 约 709 mV、固件事件 `BACK`，与网表一致。后续实验室构建已改为板上 `ACT_B` 触发并使用 `act-b-NNN.wav` 文件名；**此修订需要重新烧录后的实板验证，不能把旧版 PWR_B 结果算作 ACT_B 通过。**
+**按键名纠错与复验：**该实验固件最初把内部网 `KEYB/GPIO5` 当作板上 `ACT_B`，实际它来自 `PWR_B → Q7`。活体原理图导出网表显示 `ACT_B → R39 后的 ADC 梯 → GPIO4`；操作者短按 `ACT_B` 时实板 ADC 约 709 mV、固件事件 `BACK`，与网表一致。修订提交 `89d3a01` 将实验室录音改绑板上 `ACT_B`，由 `aliyun_raynode` 的 ESP-IDF 6.1 构建，镜像 SHA-256 `B9E60839059F9E292B02020284677D73A69F421738F45E9A0115D070BBCF2368`，以 115200 baud 写入 OTA0 并由 esptool 报告哈希校验成功。冷启动日志确认为 `ACT_B` 录音版；两次短按分别触发开始与停止，操作者确认 RGB/五灯阵列先红色常亮、后熄灭；`act-b-001.wav` 关闭成功，`samples=124800 peak=0 wav_closed=1`。**按键与灯效通过短时 L1 验证，麦克风采样仍失败。**本地日志 `.tmp/lab-act-record/serial-act-record.log`。
 
 ## PN532：供电拓扑待评估，NACK 根因未定
 

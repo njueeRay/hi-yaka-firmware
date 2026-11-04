@@ -1136,6 +1136,9 @@ if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
         sdmmc
     )
 endif()
+if(CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA esp_driver_pcnt)
+endif()
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
