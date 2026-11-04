@@ -611,6 +611,12 @@ private:
                         }
                         captured_samples += samples.size();
                     }
+                    writer.Close();
+                    ESP_LOGI(TAG,
+                             "BRINGUP microphone capture: captured=%d samples=%u peak=%d mean_square=%" PRIu64 " wav=%s",
+                             captured, static_cast<unsigned>(captured_samples), peak,
+                             captured_samples == 0 ? 0 : energy / captured_samples,
+                             recording ? "/sdcard/diagnostics/microphone-capture.wav" : "unavailable");
                     // Keep ES7210 and MICBIAS active long enough for a safe
                     // voltmeter check. The five-second WAV evidence above is
                     // already frozen; this window belongs only to lab builds.
@@ -621,12 +627,6 @@ private:
                     vTaskDelay(pdMS_TO_TICKS(kMicRailWindowSeconds * 1000));
                     ESP_LOGI(TAG, "BRINGUP MIC RAIL WINDOW END");
                     self->audio_codec_->EnableInput(false);
-                    writer.Close();
-                    ESP_LOGI(TAG,
-                             "BRINGUP microphone capture: captured=%d samples=%u peak=%d mean_square=%" PRIu64 " wav=%s",
-                             captured, static_cast<unsigned>(captured_samples), peak,
-                             captured_samples == 0 ? 0 : energy / captured_samples,
-                             recording ? "/sdcard/diagnostics/microphone-capture.wav" : "unavailable");
                 }
 
                 if (self->qmi8658a_ != nullptr) {
