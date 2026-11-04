@@ -110,7 +110,17 @@ void HiYaKaFeedback::RunBringupSelfTest() {
     ESP_LOGI(kTag, "bring-up self-test complete; feedback returned to safe-off");
 }
 
+void HiYaKaFeedback::SetLabRecordingIndicator(bool active) {
+    // Once the lab recorder is used, the RGB and LED array stay under its
+    // explicit control. State updates must not hide the recording signal.
+    lab_recording_indicator_override_ = true;
+    SetColor(active ? 8 : 0, 0, 0);
+}
+
 void HiYaKaFeedback::OnStateChanged() {
+    if (lab_recording_indicator_override_) {
+        return;
+    }
     switch (Application::GetInstance().GetDeviceState()) {
         case kDeviceStateStarting:
         case kDeviceStateWifiConfiguring:
@@ -136,6 +146,18 @@ void HiYaKaFeedback::OnStateChanged() {
 }
 
 void HiYaKaFeedback::Emit(hi_yaka::FeedbackSignal signal) {
+    if (lab_recording_indicator_override_) {
+        // Preserve the recording lamp (or its explicit off state) while
+        // keeping the existing key/motor feedback available in the lab.
+        switch (signal) {
+            case hi_yaka::FeedbackSignal::kAccepted: PulseMotor(35); break;
+            case hi_yaka::FeedbackSignal::kCompleted: PulseMotor(55); break;
+            case hi_yaka::FeedbackSignal::kWarning: PulseMotor(80); break;
+            case hi_yaka::FeedbackSignal::kError: PulseMotor(kMaximumMotorPulseMs); break;
+            case hi_yaka::FeedbackSignal::kCancelled: break;
+        }
+        return;
+    }
     switch (signal) {
         case hi_yaka::FeedbackSignal::kAccepted:
             SetColor(0, 3, 3);

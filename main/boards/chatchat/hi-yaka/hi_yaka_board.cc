@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <inttypes.h>
 #include <memory>
 #include <vector>
@@ -188,6 +189,11 @@ private:
     std::atomic<bool> nfc_scan_cancelled_{false};
     std::atomic<bool> imu_monitoring_{false};
     std::atomic<bool> imu_task_running_{false};
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    std::atomic<bool> lab_record_active_{false};
+    std::atomic<bool> lab_record_stop_requested_{false};
+    uint32_t lab_record_sequence_ = 0;
+#endif
 
     void ForcePaDisabled() {
         gpio_config_t config = {};
@@ -445,6 +451,89 @@ private:
     }
 #endif
 
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    void ToggleLabRecording() {
+        if (lab_record_active_.load()) {
+            lab_record_stop_requested_.store(true);
+            if (feedback_ != nullptr) {
+                feedback_->SetLabRecordingIndicator(false);
+            }
+            ESP_LOGI(TAG, "BRINGUP KEY_B microphone stop requested");
+            return;
+        }
+        if (audio_codec_ == nullptr || storage_ == nullptr || !storage_->ready() ||
+            feedback_ == nullptr) {
+            ESP_LOGE(TAG, "BRINGUP KEY_B microphone unavailable: codec=%d TF=%d light=%d",
+                     audio_codec_ != nullptr, storage_ != nullptr && storage_->ready(),
+                     feedback_ != nullptr);
+            return;
+        }
+
+        lab_record_stop_requested_.store(false);
+        lab_record_active_.store(true);
+        ++lab_record_sequence_;
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                char path[72] = {};
+                std::snprintf(path, sizeof(path),
+                              "/sdcard/diagnostics/key-b-%03lu.wav",
+                              static_cast<unsigned long>(self->lab_record_sequence_));
+                HiYaKaWavWriter writer;
+                const std::size_t channels = self->audio_codec_->input_channels();
+                uint64_t samples_written = 0;
+                int peak = 0;
+                if (writer.Open(path, self->audio_codec_->input_sample_rate(), channels)) {
+                    self->audio_codec_->EnableInput(true);
+                    vTaskDelay(pdMS_TO_TICKS(150));
+                    self->audio_codec_->LogInputDiagnostics();
+                    ESP_LOGI(TAG, "BRINGUP MIC RECORD START: %s channels=%u; R42/R45 measurement valid while red LEDs are on",
+                             path, static_cast<unsigned>(channels));
+                    constexpr std::size_t kFramesPerChunk = 320;
+                    constexpr uint32_t kMaximumSeconds = 180;
+                    const uint64_t sample_limit =
+                        static_cast<uint64_t>(self->audio_codec_->input_sample_rate()) *
+                        channels * kMaximumSeconds;
+                    std::vector<int16_t> samples(kFramesPerChunk * channels, 0);
+                    while (!self->lab_record_stop_requested_.load() &&
+                           samples_written < sample_limit) {
+                        if (!self->audio_codec_->InputData(samples) ||
+                            !writer.Append(samples.data(), samples.size())) {
+                            ESP_LOGE(TAG, "BRINGUP MIC RECORD read/write failed");
+                            break;
+                        }
+                        for (int16_t sample : samples) {
+                            const int magnitude = sample < 0 ? -static_cast<int>(sample)
+                                                             : static_cast<int>(sample);
+                            peak = std::max(peak, magnitude);
+                        }
+                        samples_written += samples.size();
+                    }
+                    self->audio_codec_->EnableInput(false);
+                }
+                const bool closed = writer.Close();
+                ESP_LOGI(TAG, "BRINGUP MIC RECORD STOP: %s samples=%llu peak=%d wav_closed=%d",
+                         path, static_cast<unsigned long long>(samples_written), peak,
+                         closed);
+                Application::GetInstance().Schedule([self]() {
+                    if (self->feedback_ != nullptr) {
+                        self->feedback_->SetLabRecordingIndicator(false);
+                    }
+                    self->lab_record_active_.store(false);
+                });
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_mic_key", 6144, this, 4, nullptr);
+        if (created != pdPASS) {
+            lab_record_active_.store(false);
+            ESP_LOGE(TAG, "BRINGUP KEY_B microphone task creation failed");
+            return;
+        }
+        feedback_->SetLabRecordingIndicator(true);
+        ESP_LOGI(TAG, "BRINGUP KEY_B microphone start requested; red LEDs on");
+    }
+#endif
+
 #if CONFIG_HI_YAKA_ENABLE_INPUT
     void InitializeInput() {
         if (adc_ == nullptr) {
@@ -466,6 +555,10 @@ private:
                         feedback_->Emit(hi_yaka::FeedbackSignal::kWarning);
                     }
 #endif
+                    if (key == hi_yaka::PhysicalKey::kSecondary &&
+                        gesture == hi_yaka::KeyGesture::kPress) {
+                        ToggleLabRecording();
+                    }
 #endif
 #if CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
                     hi_yaka::RuntimeAdapter::Get().OnPhysicalInput(key, gesture);
@@ -571,63 +664,8 @@ private:
                     self->feedback_->RunBringupSelfTest();
                 }
 
-                if (self->audio_codec_ != nullptr) {
-                    constexpr int kCaptureSeconds = 5;
-                    constexpr std::size_t kFramesPerChunk = 320;
-                    const std::size_t channels = self->audio_codec_->input_channels();
-                    const std::size_t total_samples =
-                        self->audio_codec_->input_sample_rate() * channels * kCaptureSeconds;
-                    std::vector<int16_t> samples(kFramesPerChunk * channels, 0);
-                    HiYaKaWavWriter writer;
-                    const bool recording = self->storage_ != nullptr && self->storage_->ready() &&
-                        writer.Open("/sdcard/diagnostics/microphone-capture.wav",
-                                    self->audio_codec_->input_sample_rate(), channels);
-                    self->audio_codec_->EnableInput(true);
-                    vTaskDelay(pdMS_TO_TICKS(150));
-                    self->audio_codec_->LogInputDiagnostics();
-                    ESP_LOGI(TAG, "BRINGUP microphone: speak now for %d seconds", kCaptureSeconds);
-                    bool captured = false;
-                    std::size_t captured_samples = 0;
-                    int peak = 0;
-                    uint64_t energy = 0;
-                    while (captured_samples < total_samples) {
-                        std::fill(samples.begin(), samples.end(), 0);
-                        const bool chunk_captured = self->audio_codec_->InputData(samples);
-                        captured = captured || chunk_captured;
-                        if (!chunk_captured) {
-                            ESP_LOGE(TAG, "BRINGUP microphone read failed after %u samples",
-                                     static_cast<unsigned>(captured_samples));
-                            break;
-                        }
-                        if (recording && !writer.Append(samples.data(), samples.size())) {
-                            ESP_LOGE(TAG, "BRINGUP microphone WAV write failed");
-                            break;
-                        }
-                        for (const int16_t sample : samples) {
-                            const int value = sample < 0 ? -static_cast<int>(sample)
-                                                         : static_cast<int>(sample);
-                            peak = std::max(peak, value);
-                            energy += static_cast<uint64_t>(value) * value;
-                        }
-                        captured_samples += samples.size();
-                    }
-                    writer.Close();
-                    ESP_LOGI(TAG,
-                             "BRINGUP microphone capture: captured=%d samples=%u peak=%d mean_square=%" PRIu64 " wav=%s",
-                             captured, static_cast<unsigned>(captured_samples), peak,
-                             captured_samples == 0 ? 0 : energy / captured_samples,
-                             recording ? "/sdcard/diagnostics/microphone-capture.wav" : "unavailable");
-                    // Keep ES7210 and MICBIAS active long enough for a safe
-                    // voltmeter check. The five-second WAV evidence above is
-                    // already frozen; this window belongs only to lab builds.
-                    constexpr int kMicRailWindowSeconds = 120;
-                    ESP_LOGI(TAG,
-                             "BRINGUP MIC RAIL WINDOW BEGIN: %d seconds; measure MICBIAS12 at R42/R45",
-                             kMicRailWindowSeconds);
-                    vTaskDelay(pdMS_TO_TICKS(kMicRailWindowSeconds * 1000));
-                    ESP_LOGI(TAG, "BRINGUP MIC RAIL WINDOW END");
-                    self->audio_codec_->EnableInput(false);
-                }
+                ESP_LOGI(TAG,
+                         "BRINGUP microphone: press KEY_B to start/stop WAV; steady red RGB and LED array mean MICBIAS is active");
 
                 if (self->qmi8658a_ != nullptr) {
                     HiYaKaImuSample sample{};
@@ -657,7 +695,7 @@ private:
                 }
 
                 ESP_LOGI(TAG,
-                         "BRINGUP READY: press UP/DOWN/LEFT/RIGHT/CONFIRM/BACK/KEY_A/KEY_B one at a time");
+                         "BRINGUP READY: KEY_A pulses motor; KEY_B toggles microphone WAV and red lights");
                 vTaskDelete(nullptr);
             },
             "hi_yaka_diag", 6144, this, 4, nullptr);

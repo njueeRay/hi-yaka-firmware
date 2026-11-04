@@ -41,9 +41,8 @@
   温度/加速度/角速度读取与物理量换算；板级轴向仍须通过六面实测冻结；
 - 两者都没有硬件 IRQ；PN532 也没有 MCU 可控复位，因此不声明深睡唤醒或
   独立硬复位恢复能力。具体 NFC 业务映射仍属于 M6 产品决策；
-- TF 卡可用时，上电诊断会生成 `diagnostics/microphone-capture.wav`（5 秒、
-  16-bit PCM）；首次数字播放另存 `diagnostics/decoded-output.wav`（最多 30 秒）。
-  这两份文件用于在功放断电时离线核验采集、解码和 I²S 数字链路；
+- 实验室构建中，`KEY_B` 短按开始录音，再短按停止；录音期间状态 RGB 与五灯阵列保持红色，停止后熄灭；单次最长 180 秒。TF 卡可用时，每次写入 `diagnostics/key-b-NNN.wav`（16-bit 双声道 PCM），停止后刷新 WAV 头并同步到卡。`KEY_A` 短按仍触发马达短振；
+- 首次数字播放另存 `diagnostics/decoded-output.wav`（最多 30 秒）。这些文件用于在功放断电时离线核验采集、解码和 I²S 数字链路；
 - 全部参数仍须按 `docs/bringup/PREBOARD_ADAPTER_STATUS.md` 逐项取得 L1/L2 证据。
 
 ## 构建

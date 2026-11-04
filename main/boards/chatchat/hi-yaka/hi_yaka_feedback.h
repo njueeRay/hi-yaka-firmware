@@ -15,6 +15,7 @@ public:
 
     esp_err_t Initialize();
     void RunBringupSelfTest();
+    void SetLabRecordingIndicator(bool active);
     void OnStateChanged() override;
     void Emit(hi_yaka::FeedbackSignal signal) override;
 
@@ -26,6 +27,7 @@ private:
     led_strip_handle_t status_rgb_ = nullptr;
     led_strip_handle_t led_array_ = nullptr;
     esp_timer_handle_t motor_timer_ = nullptr;
+    bool lab_recording_indicator_override_ = false;
 };
 
 #endif  // HI_YAKA_FEEDBACK_H_
