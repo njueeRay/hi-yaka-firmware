@@ -14,7 +14,7 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertEqual(config["manufacturer"], "chatchat")
         self.assertEqual(config["type"], "hi-yaka")
         self.assertEqual(config["target"], "esp32c6")
-        self.assertEqual(len(config["builds"]), 2)
+        self.assertEqual(len(config["builds"]), 3)
         build = config["builds"][0]
         self.assertEqual(build["name"], "hi-yaka")
         options = set(build["sdkconfig_append"])
@@ -33,6 +33,16 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", lab_options)
         self.assertNotIn("CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME=y", lab_options)
 
+        headless_build = config["builds"][2]
+        self.assertEqual(headless_build["name"], "hi-yaka-lab-headless")
+        headless_options = set(headless_build["sdkconfig_append"])
+        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_INPUT=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_FEEDBACK=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", headless_options)
+
     def test_build_selection_chain_is_complete(self):
         kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
         cmake = (ROOT / "main" / "CMakeLists.txt").read_text(encoding="utf-8")
@@ -47,6 +57,7 @@ class HiYaKaBoardContractTest(unittest.TestCase):
             "YAKA_I2C_SDA_GPIO": "GPIO_NUM_10",
             "YAKA_I2C_SCL_GPIO": "GPIO_NUM_11",
             "YAKA_PCA9557_I2C_ADDRESS": "0x19",
+            "YAKA_QMI8658A_I2C_ADDRESS": "0x6B",
             "YAKA_PCA9557_SAFE_OUTPUT": "0x40",
             "YAKA_PCA9557_SAFE_CONFIGURATION": "0x38",
         }
@@ -92,7 +103,9 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("defined(CONFIG_SPIRAM) && CONFIG_SPIRAM", source)
         self.assertIn("DummyAudioCodec", source)
         self.assertIn("PA safety interlock active", source)
-        self.assertIn("ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false", source)
+        self.assertIn(
+            "ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false", source
+        )
         self.assertIn("YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS", source)
 
     def test_lcd_does_not_consume_the_only_user_spi_controller(self):
@@ -103,6 +116,11 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("tx_config.data_width = 4", lcd_io)
         self.assertIn("chunk_size * 32", lcd_io)
         self.assertIn("EncodeSerialBytes", lcd_io)
+        self.assertIn("return result;", lcd_io)
+        self.assertLess(
+            lcd_io.index("on_color_trans_done(io"),
+            lcd_io.index("return result;", lcd_io.index("esp_err_t TxColor")),
+        )
         self.assertNotIn("size * 8, &transmit_config", lcd_io)
         self.assertIn("YAKA_TF_SCLK_GPIO GPIO_NUM_19", (BOARD_DIR / "config.h").read_text(encoding="utf-8"))
 
@@ -153,6 +171,20 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn('std::memcpy(header + 8, "WAVEfmt ", 8)', writer)
         self.assertIn('std::memcpy(header + 36, "data", 4)', writer)
         self.assertIn("fsync(fileno(file_))", writer)
+
+    def test_lab_diagnostics_expose_repeatable_motor_and_full_i2c_scan(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        self.assertIn('"BRINGUP key: name=%s gesture=%s"', board)
+        self.assertIn('"BRINGUP motor: KEY_A -> warning pulse 80 ms"', board)
+        self.assertIn("FeedbackSignal::kWarning", board)
+        self.assertIn('"BRINGUP I2C scan found: 0x%02X"', board)
+        self.assertIn("address = 0x08; address <= 0x77", board)
+
+    def test_display_restores_backlight_after_panel_init(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        create_panel = board.index("esp_lcd_new_panel_st7789")
+        restore_backlight = board.index("backlight_->RestoreBrightness()")
+        self.assertLess(create_panel, restore_backlight)
 
 
 if __name__ == "__main__":

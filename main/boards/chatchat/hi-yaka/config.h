@@ -21,7 +21,8 @@
 #define YAKA_PCA9557_I2C_ADDRESS 0x19
 #define YAKA_PN532_I2C_ADDRESS 0x24
 #define YAKA_ES7210_I2C_ADDRESS 0x41
-#define YAKA_QMI8658A_I2C_ADDRESS 0x6A
+// R90 straps SDO/SA0 to GND, selecting the QMI8658A 7-bit address 0x6B.
+#define YAKA_QMI8658A_I2C_ADDRESS 0x6B
 
 // esp_codec_dev retains the codec datasheet's 8-bit address convention and
 // shifts this value right before registering an IDF 7-bit I2C device. Keep

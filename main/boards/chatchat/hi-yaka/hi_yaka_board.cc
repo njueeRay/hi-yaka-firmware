@@ -332,6 +332,7 @@ private:
             panel_io, panel, YAKA_LCD_WIDTH, YAKA_LCD_HEIGHT, YAKA_LCD_OFFSET_X,
             YAKA_LCD_OFFSET_Y, false, false, false);
         backlight_ = std::make_unique<ExpanderBacklight>(*pca9557_);
+        backlight_->RestoreBrightness();
         ESP_LOGW(TAG, "LCD candidate enabled: orientation/color/inversion require L1 verification");
     }
 #endif
@@ -399,9 +400,10 @@ private:
             return;
         }
 
-        // First L1 candidate intentionally selects MIC1 (voice) plus MIC3
-        // (playback reference). ES7210 TDM slot order and the second physical
-        // microphone remain explicit M3 measurements, not assumptions.
+        // Three enabled ADCs force ES7210 into TDM mode, matching the ESP32-C6
+        // four-slot RX configuration. The codec data interface returns MIC1
+        // and MIC2 to the two-channel application buffer; MIC3 remains powered
+        // as the playback-reference candidate for later channel validation.
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
         audio_codec_ = std::make_unique<HiYaKaDiagnosticAudioCodec>(
 #else
@@ -411,7 +413,8 @@ private:
             YAKA_AUDIO_MCLK_GPIO, YAKA_AUDIO_BCLK_GPIO, YAKA_AUDIO_WS_GPIO,
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
             YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS, true, 24.0f, 2, 0.0f,
-            YAKA_I2C_PORT, ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false);
+            YAKA_I2C_PORT,
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false);
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
     }
@@ -438,8 +441,20 @@ private:
         }
         input_ = std::make_unique<HiYaKaInput>(*adc_);
         const esp_err_t result = input_->Initialize(
-            [](hi_yaka::PhysicalKey key, hi_yaka::KeyGesture gesture) {
-                Application::GetInstance().Schedule([key, gesture]() {
+            [this](hi_yaka::PhysicalKey key, hi_yaka::KeyGesture gesture) {
+                Application::GetInstance().Schedule([this, key, gesture]() {
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+                    ESP_LOGI(TAG, "BRINGUP key: name=%s gesture=%s",
+                             PhysicalKeyName(key),
+                             gesture == hi_yaka::KeyGesture::kLongPress ? "LONG" : "PRESS");
+#if CONFIG_HI_YAKA_ENABLE_FEEDBACK
+                    if (key == hi_yaka::PhysicalKey::kPrimary &&
+                        gesture == hi_yaka::KeyGesture::kPress && feedback_ != nullptr) {
+                        ESP_LOGI(TAG, "BRINGUP motor: KEY_A -> warning pulse 80 ms");
+                        feedback_->Emit(hi_yaka::FeedbackSignal::kWarning);
+                    }
+#endif
+#endif
 #if CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
                     hi_yaka::RuntimeAdapter::Get().OnPhysicalInput(key, gesture);
 #else
@@ -481,6 +496,20 @@ private:
             }
         }
     }
+
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    void ScanI2cBusForDiagnostics() {
+        unsigned found = 0;
+        ESP_LOGI(TAG, "BRINGUP I2C scan begin: 0x08..0x77");
+        for (uint8_t address = 0x08; address <= 0x77; ++address) {
+            if (i2c_master_probe(i2c_bus_, address, 10) == ESP_OK) {
+                ESP_LOGI(TAG, "BRINGUP I2C scan found: 0x%02X", address);
+                ++found;
+            }
+        }
+        ESP_LOGI(TAG, "BRINGUP I2C scan complete: found=%u", found);
+    }
+#endif
 
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
     void StartBringupDiagnostics() {
@@ -596,6 +625,9 @@ public:
         InitializeI2c();
         InitializePca9557SafeState();
         ProbeExpectedI2cDevices();
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        ScanI2cBusForDiagnostics();
+#endif
 #if CONFIG_HI_YAKA_ENABLE_DISPLAY
         InitializeDisplay();
 #endif

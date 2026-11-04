@@ -86,7 +86,7 @@ MVP 还必须形成配网、离线降级、文件管理、NFC 只读业务、用
 | 本地存储 | TF / SDSPI，无 card-detect | GPIO18 MOSI、19 CLK、20 MISO、15 CS；通过挂载结果判断卡状态 |
 | 共享 I²C | GPIO10 SDA、GPIO11 SCL，首板 100 kHz | 五个固定地址无冲突；每个设备必须有超时和故障隔离 |
 | NFC | PN532，I²C，首发只读，无 IRQ、无可控独立复位 | 采用有超时的轮询；失败不能阻塞首页或录音 |
-| IMU | QMI8658A，I²C 0x6A，无 IRQ | 当前只能轮询，不承诺深睡手势唤醒 |
+| IMU | QMI8658A，I²C 0x6B，无 IRQ | 当前只能轮询，不承诺深睡手势唤醒 |
 | 输入 | DPAD ADC 梯 + ACT_A/ACT_B + PWR_A/PWR_B | ADC 阈值必须用实板标定；PWR_A/B 不能从 MASTER_SW 硬关断状态唤醒 |
 | 反馈 | 单颗 RGB、五灯链、3 V ERM 振动 | 上电默认全灭/马达关闭；限制 RGB 总亮度 |
 | 电源 | MASTER_SW 直接硬切整机电源 | 任意时刻掉电是真实场景，录音、FAT、NVS、OTA 都必须可恢复 |
@@ -100,7 +100,7 @@ MVP 还必须形成配网、离线降级、文件管理、NFC 只读业务、用
 | PCA9557 | `0x19` | LCD、马达等控制 |
 | PN532 | `0x24` | NFC 只读轮询 |
 | ES7210 | `0x41` | 双麦 ADC / 播放参考 |
-| QMI8658A | `0x6A` | IMU |
+| QMI8658A | `0x6B` | IMU |
 
 PCA9557 上电必须先写 Output Port=`0x40`，再写 Configuration=`0x38`，最后读回验证。顺序反转可能短暂点亮背光、驱动马达或误选 LCD。M1 将 IO3/IO4/IO5 保持输入，其中 IO4 涉及历史 `PWR_EN` 链路，在重新确认产品语义前不主动驱动。
 

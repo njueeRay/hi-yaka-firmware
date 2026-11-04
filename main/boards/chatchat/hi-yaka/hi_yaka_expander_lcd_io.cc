@@ -121,9 +121,10 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
         return ESP_ERR_INVALID_ARG;
     }
     auto* context = ToContext(io);
+    esp_err_t result = ESP_OK;
     {
         std::lock_guard<std::mutex> lock(context->mutex);
-        esp_err_t result = context->expander->SetLcdControl(true, false);
+        result = context->expander->SetLcdControl(true, false);
         if (result == ESP_OK && lcd_cmd >= 0) {
             const uint8_t command = static_cast<uint8_t>(lcd_cmd);
             result = Transmit(context, &command, sizeof(command));
@@ -135,19 +136,19 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
             }
         }
         result = FinishTransaction(context, result);
-        if (result != ESP_OK) {
-            return result;
-        }
     }
 
     // This implementation is deliberately synchronous because CS and DC are
     // I2C-expander outputs. PARLIO provides the serial data clock without
     // consuming ESP32-C6's only user SPI controller, leaving SPI2 for TF.
+    // LVGL must receive the flush-complete callback even when the underlying
+    // transfer fails. Otherwise lv_refr waits forever and taskLVGL starves the
+    // idle task. The return value still preserves the transport failure.
     if (context->callbacks.on_color_trans_done != nullptr) {
         esp_lcd_panel_io_event_data_t event = {};
         context->callbacks.on_color_trans_done(io, &event, context->callback_context);
     }
-    return ESP_OK;
+    return result;
 }
 
 esp_err_t RxParam(esp_lcd_panel_io_t*, int, void*, size_t) {
