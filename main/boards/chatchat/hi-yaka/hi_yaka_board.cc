@@ -353,18 +353,15 @@ private:
                      YAKA_QMI8658A_I2C_ADDRESS, esp_err_to_name(imu_probe));
         }
 
-        const esp_err_t nfc_probe =
-            i2c_master_probe(i2c_bus_, YAKA_PN532_I2C_ADDRESS, 100);
-        if (nfc_probe == ESP_OK) {
-            pn532_ = std::make_unique<HiYaKaPn532>(i2c_bus_);
-            const esp_err_t result = pn532_->Initialize();
-            if (result != ESP_OK) {
-                ESP_LOGE(TAG, "PN532 initialization failed: %s", esp_err_to_name(result));
-                pn532_.reset();
-            }
-        } else {
-            ESP_LOGW(TAG, "PN532 unavailable at 0x%02X: %s",
-                     YAKA_PN532_I2C_ADDRESS, esp_err_to_name(nfc_probe));
+        // A PN532 leaving low-power may NACK the address-only probe that wakes
+        // it. Do not gate the real transport on that probe: the driver performs
+        // the required wake delay, retries and firmware-version transaction.
+        pn532_ = std::make_unique<HiYaKaPn532>(i2c_bus_);
+        const esp_err_t nfc_result = pn532_->Initialize();
+        if (nfc_result != ESP_OK) {
+            ESP_LOGE(TAG, "PN532 initialization failed: %s",
+                     esp_err_to_name(nfc_result));
+            pn532_.reset();
         }
     }
 #endif

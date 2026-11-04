@@ -177,8 +177,17 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn('"BRINGUP key: name=%s gesture=%s"', board)
         self.assertIn('"BRINGUP motor: KEY_A -> warning pulse 80 ms"', board)
         self.assertIn("FeedbackSignal::kWarning", board)
+        input_source = (BOARD_DIR / "hi_yaka_input.cc").read_text(encoding="utf-8")
+        self.assertIn('"BRINGUP input raw: ladder=%d mV decoded=%d key_a=%d key_b=%d"', input_source)
         self.assertIn('"BRINGUP I2C scan found: 0x%02X"', board)
         self.assertIn("address = 0x08; address <= 0x77", board)
+
+    def test_pn532_initialization_is_not_gated_by_address_probe(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        auxiliary = board[board.index("void InitializeAuxiliarySensors()") :]
+        pn532_section = auxiliary[auxiliary.index("pn532_ =") : auxiliary.index("#endif")]
+        self.assertNotIn("i2c_master_probe", pn532_section)
+        self.assertIn("pn532_->Initialize()", pn532_section)
 
     def test_display_restores_backlight_after_panel_init(self):
         board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
