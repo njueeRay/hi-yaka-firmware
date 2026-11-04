@@ -611,6 +611,15 @@ private:
                         }
                         captured_samples += samples.size();
                     }
+                    // Keep ES7210 and MICBIAS active long enough for a safe
+                    // voltmeter check. The five-second WAV evidence above is
+                    // already frozen; this window belongs only to lab builds.
+                    constexpr int kMicRailWindowSeconds = 120;
+                    ESP_LOGI(TAG,
+                             "BRINGUP MIC RAIL WINDOW BEGIN: %d seconds; measure MICBIAS12 at R42/R45",
+                             kMicRailWindowSeconds);
+                    vTaskDelay(pdMS_TO_TICKS(kMicRailWindowSeconds * 1000));
+                    ESP_LOGI(TAG, "BRINGUP MIC RAIL WINDOW END");
                     self->audio_codec_->EnableInput(false);
                     writer.Close();
                     ESP_LOGI(TAG,
