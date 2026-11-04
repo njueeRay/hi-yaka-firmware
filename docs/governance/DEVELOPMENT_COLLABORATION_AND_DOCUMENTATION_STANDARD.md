@@ -38,7 +38,7 @@ public   -> ChatChatTech/yaka（仅用于受控快照发布，不做日常同步
 
 1. 从最新 `main` 建短生命周期分支；
 2. 把硬件/产品契约写成测试和配置，再实现代码；
-3. 本地或 Raynode 完成格式、聚焦测试、ESP-IDF 6.1 构建和产物哈希；
+3. 本地或 `aliyun_raynode` 完成格式、聚焦测试、ESP-IDF 6.1 构建和产物哈希；
 4. 通过 PR 合入私有 `main`；PR 必须声明范围、风险、验证等级和未验证项；
 5. 需要发布时，从私有仓库的已验证 SHA 生成干净快照，经过边界扫描后提交到 `ChatChatTech/yaka/firmware`；
 6. 在 `firmware/PUBLIC_RELEASE.md` 登记私有来源 SHA、上游基线、SDK、验证等级和公开提交 SHA。
