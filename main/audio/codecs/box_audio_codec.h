@@ -47,6 +47,10 @@ public:
     virtual void SetOutputVolume(int volume) override;
     virtual void EnableInput(bool enable) override;
     virtual void EnableOutput(bool enable) override;
+
+    // Bounded raw checks for first-board audio bring-up. These do not change
+    // codec configuration or enable the speaker amplifier.
+    void LogInputDiagnostics();
 };
 
 #endif // _BOX_AUDIO_CODEC_H

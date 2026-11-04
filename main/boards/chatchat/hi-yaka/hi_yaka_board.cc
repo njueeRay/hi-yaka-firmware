@@ -333,6 +333,14 @@ private:
             YAKA_LCD_OFFSET_Y, false, false, false);
         backlight_ = std::make_unique<ExpanderBacklight>(*pca9557_);
         backlight_->RestoreBrightness();
+        uint8_t output = 0;
+        uint8_t configuration = 0;
+        const esp_err_t backlight_readback =
+            pca9557_->ReadBack(&output, &configuration);
+        ESP_LOGI(TAG,
+                 "LCD backlight latch: result=%s output=0x%02X config=0x%02X BL=%u",
+                 esp_err_to_name(backlight_readback), output, configuration,
+                 static_cast<unsigned>((output >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
         ESP_LOGW(TAG, "LCD candidate enabled: orientation/color/inversion require L1 verification");
     }
 #endif
@@ -516,6 +524,28 @@ private:
                 vTaskDelay(pdMS_TO_TICKS(4000));
                 ESP_LOGI(TAG, "BRINGUP BEGIN: bounded unified peripheral diagnostics");
 
+                if (self->pca9557_ != nullptr) {
+                    uint8_t output = 0;
+                    uint8_t configuration = 0;
+                    esp_err_t result = self->pca9557_->SetOutputBit(
+                        YAKA_PCA9557_LCD_BL_BIT, false);
+                    ESP_LOGI(TAG, "BRINGUP backlight OFF: write=%s", esp_err_to_name(result));
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    result = self->pca9557_->SetOutputBit(
+                        YAKA_PCA9557_LCD_BL_BIT, true);
+                    const esp_err_t readback =
+                        self->pca9557_->ReadBack(&output, &configuration);
+                    ESP_LOGI(TAG,
+                             "BRINGUP backlight ON: write=%s read=%s output=0x%02X config=0x%02X BL=%u",
+                             esp_err_to_name(result), esp_err_to_name(readback), output,
+                             configuration,
+                             static_cast<unsigned>((output >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
+                }
+
+                ESP_LOGI(TAG, "BRINGUP PN532 delayed address probe: %s",
+                         esp_err_to_name(i2c_master_probe(self->i2c_bus_,
+                                                           YAKA_PN532_I2C_ADDRESS, 100)));
+
                 if (self->adc_ != nullptr) {
                     int keys_mv = 0;
                     int battery_divider_mv = 0;
@@ -547,6 +577,7 @@ private:
                                     self->audio_codec_->input_sample_rate(), channels);
                     self->audio_codec_->EnableInput(true);
                     vTaskDelay(pdMS_TO_TICKS(150));
+                    self->audio_codec_->LogInputDiagnostics();
                     ESP_LOGI(TAG, "BRINGUP microphone: speak now for %d seconds", kCaptureSeconds);
                     bool captured = false;
                     std::size_t captured_samples = 0;
@@ -556,6 +587,11 @@ private:
                         std::fill(samples.begin(), samples.end(), 0);
                         const bool chunk_captured = self->audio_codec_->InputData(samples);
                         captured = captured || chunk_captured;
+                        if (!chunk_captured) {
+                            ESP_LOGE(TAG, "BRINGUP microphone read failed after %u samples",
+                                     static_cast<unsigned>(captured_samples));
+                            break;
+                        }
                         if (recording && !writer.Append(samples.data(), samples.size())) {
                             ESP_LOGE(TAG, "BRINGUP microphone WAV write failed");
                             break;

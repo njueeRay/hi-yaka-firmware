@@ -3,6 +3,8 @@
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <driver/i2s_tdm.h>
+#include <algorithm>
+#include <array>
 
 #define TAG "BoxAudioCodec"
 
@@ -249,10 +251,53 @@ void BoxAudioCodec::EnableOutput(bool enable) {
 }
 
 int BoxAudioCodec::Read(int16_t* dest, int samples) {
-    if (input_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(input_dev_, (void*)dest, samples * sizeof(int16_t)));
+    if (!input_enabled_ || dest == nullptr || samples <= 0) {
+        return 0;
+    }
+    const int result = esp_codec_dev_read(input_dev_, dest, samples * sizeof(int16_t));
+    if (result != ESP_CODEC_DEV_OK) {
+        ESP_LOGE(TAG, "input read failed: codec result=%d samples=%d", result, samples);
+        return 0;
     }
     return samples;
+}
+
+void BoxAudioCodec::LogInputDiagnostics() {
+    if (!input_enabled_) {
+        ESP_LOGW(TAG, "input diagnostic skipped: input disabled");
+        return;
+    }
+    constexpr std::array<int, 16> kRegisters = {
+        0x00, 0x01, 0x06, 0x11, 0x12, 0x40, 0x41, 0x42,
+        0x43, 0x44, 0x45, 0x46, 0x49, 0x4A, 0x4B, 0x4C,
+    };
+    for (const int reg : kRegisters) {
+        int value = 0;
+        const int result = esp_codec_dev_read_reg(input_dev_, reg, &value);
+        ESP_LOGI(TAG, "ES7210 register 0x%02X: result=%d value=0x%02X", reg,
+                 result, value & 0xFF);
+    }
+
+    std::array<int16_t, 512> raw{};
+    size_t bytes_read = 0;
+    const esp_err_t result = i2s_channel_read(rx_handle_, raw.data(),
+                                               raw.size() * sizeof(raw[0]),
+                                               &bytes_read, pdMS_TO_TICKS(250));
+    int peak_even = 0;
+    int peak_odd = 0;
+    size_t nonzero = 0;
+    for (size_t index = 0; index < bytes_read / sizeof(raw[0]); ++index) {
+        const int value = raw[index] < 0 ? -static_cast<int>(raw[index])
+                                         : static_cast<int>(raw[index]);
+        (index & 1U ? peak_odd : peak_even) =
+            std::max(index & 1U ? peak_odd : peak_even, value);
+        nonzero += raw[index] != 0;
+    }
+    ESP_LOGI(TAG,
+             "raw I2S RX: result=%s bytes=%u nonzero=%u even_peak=%d odd_peak=%d first=%d,%d,%d,%d",
+             esp_err_to_name(result), static_cast<unsigned>(bytes_read),
+             static_cast<unsigned>(nonzero), peak_even, peak_odd,
+             raw[0], raw[1], raw[2], raw[3]);
 }
 
 int BoxAudioCodec::Write(const int16_t* data, int samples) {
