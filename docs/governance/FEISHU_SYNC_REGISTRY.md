@@ -17,7 +17,7 @@
 | `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 90 | 页首阶段与单一周日志已对齐 L7 隔离、全外设 L0 驱动、WAV 留样、CI 和后续受控烧录 |
 | `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 31 | GPIO23 当前隔离边界、TF WAV、PN532 与 QMI8658A 驱动契约已同步；PA 继续硬禁用 |
 | `docs/hardware/HIYAKA_U11_THERMAL_INCIDENT_AND_RECOVERY.md` | [04 U11 异常发热失效复盘与现板恢复方案](https://scnlb1lk96sb.feishu.cn/docx/XoLCdhpQqoQjjDxHEhyciFfxnJe) | `XoLCdhpQqoQjjDxHEhyciFfxnJe` | 8 | `HIYAKA-HW-INC-001` 根因保留；新增 L7 拆除后的现场观察、开发隔离条件与发布决定 |
-| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 12 | HiYaKa 板级事实、无代际后缀命名与板级契约用语已回读；位于 `03 协作、决策与调研` |
+| `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 15 | 已回读执行环境边界：Windows 只做烧录/串口/实板调试，构建与测试统一在 `aliyun_raynode` 或 GitHub Actions/Linux |
 | 仓库、上游与技术决策 | [02 决策与版本记录](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 14 | 保存正式 ADR 与版本影响 |
 | `.agents/skills/yaka-project/references/yaka-3.0-owner-decisions-and-todos.md` | [03 当前角色、Owner 决策与待办](https://scnlb1lk96sb.feishu.cn/docx/Y5SqdV9zloa3eLxQZALcTDQ4nOe) | `Y5SqdV9zloa3eLxQZALcTDQ4nOe` | 17 | 已覆盖旧静态放行与“等待样机”状态；同步 L7 隔离、PN532/QMI8658A、WAV、M1 恢复边界及下一版 ECO 待办 |
 | 外部资料治理与 `docs/research/VELXIO_SIMULATION_EVALUATION.md` | [04 外部参考与技术调研](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 11 | 现行适用版本统一为 HiYaKa；位于 `03 协作、决策与调研` |
@@ -54,6 +54,8 @@
 2026-11-04 完成首板风险遏制与全外设 L0 增量同步：当前开发样机拆除 L7 后不再快速升温，`HIYAKA-HW-INC-001` 根因和原始 `FAIL` 证据不覆盖，非功放 M1 调整为受控 `CONDITIONAL GO`。PN532/QMI8658A 已从地址探测升级为完整 L0 业务驱动，实验室构建新增麦克风和解码输出 WAV；PR #15 的板级/主机合同、产品核心及 20 个代表性板型矩阵全部通过。固件 PRD revision 157、硬件主文档 revision 90、接口表 revision 31、专项复盘 revision 8、项目总览 revision 44、Owner 决策台账 revision 17 均已更新并回读；操作者离场期间 MASTER OFF，功放播放和下一版制造继续 `NO-GO`。
 
 同日追加架构 v1.6：将 M2–M6 L0、PN532/QMI8658A、数字音频 WAV、L7/PA 禁用边界和 `aliyun_raynode` 命名写回唯一 draw.io 源，并重新检查四页统一颜色/线型图例。旧 v1.5 附件不覆盖；v1.6 的 Markdown、draw.io、PDF 和四页正文图追加到固件 PRD，回读到 revision 171。
+
+同日冻结执行环境边界：Windows 本地机只承担 USB/串口、烧录、实板调试和日志采集；固件构建、host tests、合同检查、资源门禁和候选产物统一在 `aliyun_raynode` 或 GitHub Actions/Linux 完成。项目 skill 已加入同一硬规则并通过结构校验；飞书协作规范回读到 revision 15。
 
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）；当前公开固件快照：`ChatChatTech/yaka@0489e83`（2026-11-02）。
 

@@ -37,6 +37,12 @@
 - M2–M5 及 PN532/QMI8658A 当前最高证据均为 L0。屏幕方向与色序、按键阈值、音频通道与声学、TF 掉电安全、联网体验、NFC/IMU 行为和 OTA 回滚必须等待实板证据；
 - 代码、资源门禁、23 项定向测试和 PR #15 的 20 个构建变体已全部通过；不得据此关闭 M1–M6、恢复功放或创建产品 Release。
 
+## 执行环境边界
+
+- Windows 本地机只承担 USB/串口、烧录、实板调试和日志采集，不作为编译或全仓测试环境；
+- ESP-IDF 6.1 实际构建、host tests、板级/产品合同、资源门禁和候选产物在 `aliyun_raynode` 或 GitHub Actions 的 Linux 环境执行；
+- Windows 上的编码、临时目录文件锁、编译器或 sanitizer 依赖差异不进入 HiYaKa 缺陷结论，除非它直接影响烧录、串口或实板调试链路。
+
 ## 上游同步
 
 产品开发固定 release/tag，不追上游 `main`。`origin` 指向产品私有仓库，`upstream` 只拉取；同步在 `sync/xiaozhi-vX.Y.Z` 分支单独 PR，不混入产品功能。细节见 `UPSTREAM.md`。
