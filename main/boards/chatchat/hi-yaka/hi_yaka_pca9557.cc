@@ -2,6 +2,7 @@
 
 #include "config.h"
 
+#include <driver/gpio.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -50,6 +51,11 @@ esp_err_t HiYaKaPca9557::WriteRegisterLocked(uint8_t reg, uint8_t value) {
             vTaskDelay(pdMS_TO_TICKS(1));
         }
     }
+    ESP_LOGE(kTag,
+             "register 0x%02X write exhausted (%s): SDA(GPIO%d)=%d SCL(GPIO%d)=%d",
+             reg, esp_err_to_name(result), static_cast<int>(YAKA_I2C_SDA_GPIO),
+             gpio_get_level(YAKA_I2C_SDA_GPIO), static_cast<int>(YAKA_I2C_SCL_GPIO),
+             gpio_get_level(YAKA_I2C_SCL_GPIO));
     return result;
 }
 

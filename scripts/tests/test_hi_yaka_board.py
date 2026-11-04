@@ -132,6 +132,9 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("kRegisterWriteAttempts = 3", source)
         self.assertIn("attempt <= kRegisterWriteAttempts", source)
         self.assertIn("i2c_master_transmit(device_, data, sizeof(data), 100)", source)
+        self.assertIn('"register 0x%02X write exhausted', source)
+        self.assertIn("gpio_get_level(YAKA_I2C_SDA_GPIO)", source)
+        self.assertIn("gpio_get_level(YAKA_I2C_SCL_GPIO)", source)
 
     def test_recording_commit_is_rejected_after_loss_or_write_failure(self):
         runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(
