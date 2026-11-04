@@ -405,10 +405,9 @@ private:
             return;
         }
 
-        // Three enabled ADCs force ES7210 into TDM mode, matching the ESP32-C6
-        // four-slot RX configuration. The codec data interface returns MIC1
-        // and MIC2 to the two-channel application buffer; MIC3 remains powered
-        // as the playback-reference candidate for later channel validation.
+        // Lab builds isolate both physical microphones on a standard stereo
+        // frame. This distinguishes a TDM/clock mismatch from a dead SDOUT1
+        // path; the production candidate retains its three-channel TDM plan.
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
         audio_codec_ = std::make_unique<HiYaKaDiagnosticAudioCodec>(
 #else
@@ -417,9 +416,14 @@ private:
             i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             YAKA_AUDIO_MCLK_GPIO, YAKA_AUDIO_BCLK_GPIO, YAKA_AUDIO_WS_GPIO,
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
-            YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS, true, 24.0f, 2, 0.0f,
-            YAKA_I2C_PORT,
-            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false);
+            YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS,
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+            false, 24.0f, -1, 0.0f, YAKA_I2C_PORT,
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true);
+#else
+            true, 24.0f, 2, 0.0f, YAKA_I2C_PORT,
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false, false);
+#endif
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
     }

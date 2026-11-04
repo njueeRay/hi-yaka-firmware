@@ -14,7 +14,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
                              uint8_t es7210_addr, bool input_reference, float input_gain,
                              int reference_gain_channel, float reference_gain,
                              i2c_port_t i2c_port, uint32_t es7210_mic_mask,
-                             bool speaker_pa_enabled) {
+                             bool speaker_pa_enabled, bool std_stereo_input) {
     duplex_ = true;                              // 是否双工
     input_reference_ = input_reference;          // 是否使用参考输入，实现回声消除
     input_channels_ = input_reference_ ? 2 : 1;  // 输入通道数
@@ -24,6 +24,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     reference_gain_channel_ = reference_gain_channel;
     reference_gain_ = reference_gain;
     speaker_pa_enabled_ = speaker_pa_enabled;
+    std_stereo_input_ = std_stereo_input;
 
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
 
@@ -185,7 +186,14 @@ void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
     };
 
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_handle_, &std_cfg));
-    ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+    if (std_stereo_input_) {
+        i2s_std_config_t rx_std_cfg = std_cfg;
+        rx_std_cfg.gpio_cfg.dout = I2S_GPIO_UNUSED;
+        rx_std_cfg.gpio_cfg.din = din;
+        ESP_ERROR_CHECK(i2s_channel_init_std_mode(rx_handle_, &rx_std_cfg));
+    } else {
+        ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+    }
     ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
     ESP_ERROR_CHECK(i2s_channel_enable(rx_handle_));
     ESP_LOGI(TAG, "Duplex channels created");
@@ -204,7 +212,7 @@ void BoxAudioCodec::EnableInput(bool enable) {
     if (enable) {
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
-            .channel = 4,
+            .channel = static_cast<uint8_t>(std_stereo_input_ ? 2 : 4),
             .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
             .sample_rate = (uint32_t)output_sample_rate_,
             .mclk_multiple = 0,

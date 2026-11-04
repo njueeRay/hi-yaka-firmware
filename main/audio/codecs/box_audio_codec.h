@@ -24,6 +24,7 @@ private:
     int reference_gain_channel_ = -1;
     float reference_gain_ = 0.0f;
     bool speaker_pa_enabled_ = true;
+    bool std_stereo_input_ = false;
     bool digital_output_observed_ = false;
 
     void CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout,
@@ -41,7 +42,8 @@ public:
                   i2c_port_t i2c_port = static_cast<i2c_port_t>(1),
                   uint32_t es7210_mic_mask =
                       ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4,
-                  bool speaker_pa_enabled = true);
+                  bool speaker_pa_enabled = true,
+                  bool std_stereo_input = false);
     virtual ~BoxAudioCodec();
 
     virtual void SetOutputVolume(int volume) override;
