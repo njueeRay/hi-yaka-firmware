@@ -131,6 +131,18 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("BoardBeginNfcScan()", runtime)
         self.assertIn("SetBoardImuMonitoring(enabled)", runtime)
 
+    def test_lab_audio_diagnostics_are_bounded_and_replayable(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        writer = (BOARD_DIR / "hi_yaka_wav_writer.cc").read_text(encoding="utf-8")
+        self.assertIn("microphone-capture.wav", board)
+        self.assertIn("decoded-output.wav", board)
+        self.assertIn("kCaptureSeconds = 5", board)
+        self.assertIn("kMaximumSeconds = 30", board)
+        self.assertIn('std::memcpy(header, "RIFF", 4)', writer)
+        self.assertIn('std::memcpy(header + 8, "WAVEfmt ", 8)', writer)
+        self.assertIn('std::memcpy(header + 36, "data", 4)', writer)
+        self.assertIn("fsync(fileno(file_))", writer)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,6 +13,7 @@
 #include "hi_yaka_pn532.h"
 #include "hi_yaka_qmi8658a.h"
 #include "hi_yaka_storage.h"
+#include "hi_yaka_wav_writer.h"
 #include "recording_store.h"
 #include "runtime_adapter.h"
 
@@ -118,6 +119,52 @@ protected:
 private:
     HiYaKaPca9557& expander_;
 };
+
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+class HiYaKaDiagnosticAudioCodec final : public BoxAudioCodec {
+public:
+    using BoxAudioCodec::BoxAudioCodec;
+
+    void OutputData(std::vector<int16_t>& data) override {
+        BoxAudioCodec::OutputData(data);
+        if (capture_complete_ || data.empty()) {
+            return;
+        }
+        if (!capture_attempted_) {
+            capture_attempted_ = true;
+            if (!writer_.Open("/sdcard/diagnostics/decoded-output.wav",
+                              output_sample_rate(), output_channels())) {
+                capture_complete_ = true;
+                return;
+            }
+        }
+        constexpr uint32_t kMaximumSeconds = 30;
+        const uint32_t maximum_bytes =
+            output_sample_rate() * output_channels() * sizeof(int16_t) * kMaximumSeconds;
+        const uint32_t remaining_bytes = maximum_bytes - writer_.data_bytes();
+        const std::size_t samples_to_write =
+            std::min<std::size_t>(data.size(), remaining_bytes / sizeof(int16_t));
+        if (!writer_.Append(data.data(), samples_to_write) ||
+            writer_.data_bytes() >= maximum_bytes) {
+            writer_.Close();
+            capture_complete_ = true;
+        }
+    }
+
+    void EnableOutput(bool enable) override {
+        BoxAudioCodec::EnableOutput(enable);
+        if (!enable && writer_.open()) {
+            writer_.Close();
+            capture_complete_ = true;
+        }
+    }
+
+private:
+    HiYaKaWavWriter writer_;
+    bool capture_attempted_ = false;
+    bool capture_complete_ = false;
+};
+#endif
 
 }  // namespace
 
@@ -355,7 +402,11 @@ private:
         // First L1 candidate intentionally selects MIC1 (voice) plus MIC3
         // (playback reference). ES7210 TDM slot order and the second physical
         // microphone remain explicit M3 measurements, not assumptions.
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        audio_codec_ = std::make_unique<HiYaKaDiagnosticAudioCodec>(
+#else
         audio_codec_ = std::make_unique<BoxAudioCodec>(
+#endif
             i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             YAKA_AUDIO_MCLK_GPIO, YAKA_AUDIO_BCLK_GPIO, YAKA_AUDIO_WS_GPIO,
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
@@ -458,23 +509,46 @@ private:
                 }
 
                 if (self->audio_codec_ != nullptr) {
-                    std::vector<int16_t> samples(1600, 0);
+                    constexpr int kCaptureSeconds = 5;
+                    constexpr std::size_t kFramesPerChunk = 320;
+                    const std::size_t channels = self->audio_codec_->input_channels();
+                    const std::size_t total_samples =
+                        self->audio_codec_->input_sample_rate() * channels * kCaptureSeconds;
+                    std::vector<int16_t> samples(kFramesPerChunk * channels, 0);
+                    HiYaKaWavWriter writer;
+                    const bool recording = self->storage_ != nullptr && self->storage_->ready() &&
+                        writer.Open("/sdcard/diagnostics/microphone-capture.wav",
+                                    self->audio_codec_->input_sample_rate(), channels);
                     self->audio_codec_->EnableInput(true);
                     vTaskDelay(pdMS_TO_TICKS(150));
-                    const bool captured = self->audio_codec_->InputData(samples);
-                    self->audio_codec_->EnableInput(false);
+                    ESP_LOGI(TAG, "BRINGUP microphone: speak now for %d seconds", kCaptureSeconds);
+                    bool captured = false;
+                    std::size_t captured_samples = 0;
                     int peak = 0;
                     uint64_t energy = 0;
-                    for (const int16_t sample : samples) {
-                        const int value = sample < 0 ? -static_cast<int>(sample)
-                                                     : static_cast<int>(sample);
-                        peak = std::max(peak, value);
-                        energy += static_cast<uint64_t>(value) * value;
+                    while (captured_samples < total_samples) {
+                        std::fill(samples.begin(), samples.end(), 0);
+                        const bool chunk_captured = self->audio_codec_->InputData(samples);
+                        captured = captured || chunk_captured;
+                        if (recording && !writer.Append(samples.data(), samples.size())) {
+                            ESP_LOGE(TAG, "BRINGUP microphone WAV write failed");
+                            break;
+                        }
+                        for (const int16_t sample : samples) {
+                            const int value = sample < 0 ? -static_cast<int>(sample)
+                                                         : static_cast<int>(sample);
+                            peak = std::max(peak, value);
+                            energy += static_cast<uint64_t>(value) * value;
+                        }
+                        captured_samples += samples.size();
                     }
+                    self->audio_codec_->EnableInput(false);
+                    writer.Close();
                     ESP_LOGI(TAG,
-                             "BRINGUP microphone capture: captured=%d samples=%u peak=%d mean_square=%" PRIu64,
-                             captured, static_cast<unsigned>(samples.size()), peak,
-                             energy / samples.size());
+                             "BRINGUP microphone capture: captured=%d samples=%u peak=%d mean_square=%" PRIu64 " wav=%s",
+                             captured, static_cast<unsigned>(captured_samples), peak,
+                             captured_samples == 0 ? 0 : energy / captured_samples,
+                             recording ? "/sdcard/diagnostics/microphone-capture.wav" : "unavailable");
                 }
 
                 if (self->qmi8658a_ != nullptr) {
