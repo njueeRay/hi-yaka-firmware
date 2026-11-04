@@ -67,7 +67,7 @@ constexpr std::array<ExpectedI2cDevice, 5> kExpectedI2cDevices = {{
 
 const char* PhysicalKeyName(hi_yaka::PhysicalKey key) {
     constexpr std::array<const char*, 8> kNames = {{
-        "UP", "DOWN", "LEFT", "RIGHT", "CONFIRM", "BACK", "KEY_A", "KEY_B",
+        "UP", "DOWN", "LEFT", "RIGHT", "ACT_A", "ACT_B", "PWR_A", "PWR_B",
     }};
     const auto index = static_cast<std::size_t>(key);
     return index < kNames.size() ? kNames[index] : "UNKNOWN";
@@ -458,12 +458,12 @@ private:
             if (feedback_ != nullptr) {
                 feedback_->SetLabRecordingIndicator(false);
             }
-            ESP_LOGI(TAG, "BRINGUP KEY_B microphone stop requested");
+            ESP_LOGI(TAG, "BRINGUP ACT_B microphone stop requested");
             return;
         }
         if (audio_codec_ == nullptr || storage_ == nullptr || !storage_->ready() ||
             feedback_ == nullptr) {
-            ESP_LOGE(TAG, "BRINGUP KEY_B microphone unavailable: codec=%d TF=%d light=%d",
+            ESP_LOGE(TAG, "BRINGUP ACT_B microphone unavailable: codec=%d TF=%d light=%d",
                      audio_codec_ != nullptr, storage_ != nullptr && storage_->ready(),
                      feedback_ != nullptr);
             return;
@@ -477,7 +477,7 @@ private:
                 auto* self = static_cast<HiYaKaBoard*>(context);
                 char path[72] = {};
                 std::snprintf(path, sizeof(path),
-                              "/sdcard/diagnostics/key-b-%03lu.wav",
+                              "/sdcard/diagnostics/act-b-%03lu.wav",
                               static_cast<unsigned long>(self->lab_record_sequence_));
                 HiYaKaWavWriter writer;
                 const std::size_t channels = self->audio_codec_->input_channels();
@@ -523,14 +523,14 @@ private:
                 });
                 vTaskDelete(nullptr);
             },
-            "hi_yaka_mic_key", 6144, this, 4, nullptr);
+            "hi_yaka_mic_act_b", 6144, this, 4, nullptr);
         if (created != pdPASS) {
             lab_record_active_.store(false);
-            ESP_LOGE(TAG, "BRINGUP KEY_B microphone task creation failed");
+            ESP_LOGE(TAG, "BRINGUP ACT_B microphone task creation failed");
             return;
         }
         feedback_->SetLabRecordingIndicator(true);
-        ESP_LOGI(TAG, "BRINGUP KEY_B microphone start requested; red LEDs on");
+        ESP_LOGI(TAG, "BRINGUP ACT_B microphone start requested; red LEDs on");
     }
 #endif
 
@@ -551,11 +551,11 @@ private:
 #if CONFIG_HI_YAKA_ENABLE_FEEDBACK
                     if (key == hi_yaka::PhysicalKey::kPrimary &&
                         gesture == hi_yaka::KeyGesture::kPress && feedback_ != nullptr) {
-                        ESP_LOGI(TAG, "BRINGUP motor: KEY_A -> warning pulse 80 ms");
+                        ESP_LOGI(TAG, "BRINGUP motor: PWR_A -> warning pulse 80 ms");
                         feedback_->Emit(hi_yaka::FeedbackSignal::kWarning);
                     }
 #endif
-                    if (key == hi_yaka::PhysicalKey::kSecondary &&
+                    if (key == hi_yaka::PhysicalKey::kBack &&
                         gesture == hi_yaka::KeyGesture::kPress) {
                         ToggleLabRecording();
                     }
@@ -665,7 +665,7 @@ private:
                 }
 
                 ESP_LOGI(TAG,
-                         "BRINGUP microphone: press KEY_B to start/stop WAV; steady red RGB and LED array mean MICBIAS is active");
+                         "BRINGUP microphone: press ACT_B to start/stop WAV; steady red RGB and LED array mean MICBIAS is active");
 
                 if (self->qmi8658a_ != nullptr) {
                     HiYaKaImuSample sample{};
@@ -695,7 +695,7 @@ private:
                 }
 
                 ESP_LOGI(TAG,
-                         "BRINGUP READY: KEY_A pulses motor; KEY_B toggles microphone WAV and red lights");
+                         "BRINGUP READY: PWR_A pulses motor; ACT_B toggles microphone WAV and red lights");
                 vTaskDelete(nullptr);
             },
             "hi_yaka_diag", 6144, this, 4, nullptr);

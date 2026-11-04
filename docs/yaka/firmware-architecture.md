@@ -336,6 +336,6 @@ M1 的 16 MiB 分区结果为：NVS 16 KiB、OTA data 8 KiB、两个 4032 KiB ap
 
 ## 13. 当前状态
 
-截至 2026-11-04：PH0–PH5 已取得 L0 证据；M2–M5 的确定性工作已推进到真实板级适配。实现包括分模块安全开关、PCA9557 并发安全控制、LCD PARLIO panel IO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs、AudioService PCM 分流、独立录音写卡任务和 `RuntimeAdapter`。PN532 已具备有界 ISO14443A 只读轮询，QMI8658A 已具备约 112 Hz 六轴采样；实验室构建还能把 5 秒麦克风采集和首次解码输出保存为标准 WAV。ESP32-C6 只有一个用户 SPI 控制器，因此资源合同固定为 TF 独占 SPI2、LCD 使用 PARLIO 候选路径。
+截至 2026-11-04：PH0–PH5 已取得 L0 证据；M2–M5 的确定性工作已推进到真实板级适配。实现包括分模块安全开关、PCA9557 并发安全控制、LCD PARLIO panel IO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs、AudioService PCM 分流、独立录音写卡任务和 `RuntimeAdapter`。PN532 已具备有界 ISO14443A 只读轮询，QMI8658A 已具备约 112 Hz 六轴采样；实验室构建由板上 `ACT_B` 临时启停有界麦克风 WAV（红灯指示、单次最多 180 秒），首次解码输出也保存为标准 WAV（最多 30 秒）。`ACT_B` 属于 ADC 梯，内部 `KEYB` 网实际对应板上 `PWR_B`。ESP32-C6 只有一个用户 SPI 控制器，因此资源合同固定为 TF 独占 SPI2、LCD 使用 PARLIO 候选路径。
 
 实板已发现并复现 U11/BOOST P0 失效链；当前开发样机拆除 L7 后不再快速升温，但功放根因和下一版 ECO 尚未关闭。`hi-yaka` 仍是 M1 安全构建，`hi-yaka-lab` 只用于操作者在场时的受控逐项调试。除 L7 隔离后的现场温升观察外，屏幕、输入阈值、音频通道、TF/FAT、NFC、IMU、联网体验和 OTA 回滚仍缺少完整 L1/L2 证据。

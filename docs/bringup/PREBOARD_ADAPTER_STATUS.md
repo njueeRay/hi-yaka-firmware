@@ -18,7 +18,7 @@
 | 里程碑 | 已实现的代码路径 | 当前可确认 | 实板仍须确认 |
 |---|---|---|---|
 | M2 | PCA9557 并发安全控制、ST7789 PARLIO panel IO、ADC/GPIO 输入、RGB/灯阵/马达、电池 ADC | 初始化顺序、资源所有权、去抖和安全上限已编码 | 屏幕方向/色序/偏移、按键阈值、亮度、电流、电池曲线 |
-| M3 | `BoxAudioCodec` 接入 I²C0、ES8311/ES7210；PA 强制禁用；实验室构建由 `KEY_B` 启停麦克风 WAV，红灯指示并限制单次 180 秒，首次解码输出另存 WAV | codec 构造、上游 AudioService 接缝和离线数字音频留样可编译 | 当前实板麦克风在 TDM/双声道两种配置下均全零；待查偏置、时钟、SDOUT1 与双麦映射；当前板不验证功放/扬声器 |
+| M3 | `BoxAudioCodec` 接入 I²C0、ES8311/ES7210；PA 强制禁用；实验室构建由板上 `ACT_B` 启停麦克风 WAV，红灯指示并限制单次 180 秒，首次解码输出另存 WAV | codec 构造、上游 AudioService 接缝和离线数字音频留样可编译 | 当前实板麦克风在 TDM/双声道两种配置下均全零；待查时钟、SDOUT1 与双麦映射；当前板不验证功放/扬声器 |
 | M4 | TF 独占 SPI2、FatFs 挂载、`RecordingBackend`、PCM 有界队列和独立写卡任务 | 无卡可降级；`.part`/checkpoint/sync/rename/恢复路径已编码；丢块或写失败禁止提交；诊断 WAV 有时长上限 | 卡兼容、慢卡、满卡、热拔插、长录音、硬切恢复、WAV 可播放性和文件互操作 |
 | M5 | `RuntimeAdapter` 连接 ProductController、网络事件、上游 DeviceState、实体输入、音频与存储端口 | 不重写小智协议；配网/会话状态进入统一产品协调者 | 首次配网、弱网、重连、多轮对话、打断、并发内存稳定性 |
 
@@ -47,7 +47,7 @@ LCD 的 PARLIO 方案、10 MHz 时钟以及面板方向/偏移仍是待 L1 验�
 2. 只启用 `DISPLAY`，确认背光最后开启、复位、色序、方向、边界和持续刷新；
 3. 启用 `INPUT`、`BATTERY`，采集原始 ADC 分布后修订阈值与电量曲线；
 4. 启用 `FEEDBACK`，从最低亮度与 20 ms 马达脉冲开始，观察 3.3 V 电源轨；
-5. 启用 `AUDIO`，保持 PA 物理及软件关闭，按 `KEY_B` 开始/停止录音，红灯亮时测偏置与时钟，停止后从 TF 导出 `diagnostics/key-b-NNN.wav`；首次解码输出仍从 `decoded-output.wav` 导出；当前样机不验证扬声器；
+5. 启用 `AUDIO`，保持 PA 物理及软件关闭，按板上 `ACT_B` 开始/停止录音，红灯亮时测偏置与时钟，停止后从 TF 导出 `diagnostics/act-b-NNN.wav`；首次解码输出仍从 `decoded-output.wav` 导出；当前样机不验证扬声器；
 6. 启用 `STORAGE`，先做挂载与小文件，再做 PCM、慢卡、满卡、拔卡和随机硬切；
 7. 启用 `PRODUCT_RUNTIME`，完成配网、对话、录音与错误恢复的组合路径；
 8. 最后启用辅助传感器并进入 M6；M2–M5 的 L2 证据未完成前不得跳到发布结论。
