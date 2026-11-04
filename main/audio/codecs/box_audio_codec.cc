@@ -275,15 +275,20 @@ void BoxAudioCodec::LogInputDiagnostics() {
         ESP_LOGW(TAG, "input diagnostic skipped: input disabled");
         return;
     }
-    constexpr std::array<int, 16> kRegisters = {
-        0x00, 0x01, 0x06, 0x11, 0x12, 0x40, 0x41, 0x42,
-        0x43, 0x44, 0x45, 0x46, 0x49, 0x4A, 0x4B, 0x4C,
+    constexpr std::array<int, 23> kRegisters = {
+        0x00, 0x01, 0x02, 0x06, 0x08, 0x0B, 0x11, 0x12,
+        0x14, 0x15, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
+        0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C,
     };
     for (const int reg : kRegisters) {
         int value = 0;
         const int result = esp_codec_dev_read_reg(input_dev_, reg, &value);
         ESP_LOGI(TAG, "ES7210 register 0x%02X: result=%d value=0x%02X", reg,
                  result, value & 0xFF);
+        if (reg == 0x0B && result == 0) {
+            ESP_LOGI(TAG, "ES7210 chip state: %d (0=power-down, 1=initial, 2=normal, 3=power-up)",
+                     value & 0x03);
+        }
     }
 
     std::array<int16_t, 512> raw{};
