@@ -93,6 +93,10 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("parlio_new_tx_unit", lcd_io)
         self.assertNotIn("spi_bus_initialize", lcd_io)
         self.assertNotIn("spi_bus_add_device", lcd_io)
+        self.assertIn("tx_config.data_width = 4", lcd_io)
+        self.assertIn("chunk_size * 32", lcd_io)
+        self.assertIn("EncodeSerialBytes", lcd_io)
+        self.assertNotIn("size * 8, &transmit_config", lcd_io)
         self.assertIn("YAKA_TF_SCLK_GPIO GPIO_NUM_19", (BOARD_DIR / "config.h").read_text(encoding="utf-8"))
 
     def test_recording_commit_is_rejected_after_loss_or_write_failure(self):

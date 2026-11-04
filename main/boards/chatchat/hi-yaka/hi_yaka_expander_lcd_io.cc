@@ -2,18 +2,30 @@
 
 #include "config.h"
 
+#include <algorithm>
+#include <cstdlib>
 #include <mutex>
 #include <new>
 
 #include <driver/parlio_tx.h>
+#include <esp_heap_caps.h>
 #include <esp_lcd_panel_io_interface.h>
 
 namespace {
+
+constexpr size_t kSerialChunkBytes =
+    YAKA_LCD_WIDTH * 20 * sizeof(uint16_t);
+constexpr size_t kEncodedBytesPerSerialByte = 4;
+constexpr size_t kEncodedChunkBytes =
+    kSerialChunkBytes * kEncodedBytesPerSerialByte;
+
+static_assert(kEncodedChunkBytes % sizeof(uint32_t) == 0);
 
 struct ExpanderLcdIo {
     esp_lcd_panel_io_t base{};
     parlio_tx_unit_handle_t tx_unit = nullptr;
     HiYaKaPca9557* expander = nullptr;
+    uint8_t* encoded_buffer = nullptr;
     esp_lcd_panel_io_callbacks_t callbacks{};
     void* callback_context = nullptr;
     std::mutex mutex;
@@ -23,21 +35,57 @@ ExpanderLcdIo* ToContext(esp_lcd_panel_io_t* io) {
     return reinterpret_cast<ExpanderLcdIo*>(io);
 }
 
-esp_err_t Transmit(parlio_tx_unit_handle_t tx_unit, const void* data, size_t size) {
+void EncodeSerialBytes(const uint8_t* source, size_t size, uint8_t* destination) {
+    // ESP32-C6 PARLIO cannot reliably terminate sub-32-bit DMA transfers. Use
+    // a four-bit parallel bus with only data line 0 connected. Each source
+    // bit becomes bit 0 of one four-bit bus cycle, so one serial byte becomes
+    // exactly 32 DMA bits while still producing exactly eight LCD clocks.
+    for (size_t index = 0; index < size; ++index) {
+        const uint8_t value = source[index];
+        destination[index * 4] =
+            ((value & 0x80U) != 0 ? 0x10U : 0x00U) |
+            ((value & 0x40U) != 0 ? 0x01U : 0x00U);
+        destination[index * 4 + 1] =
+            ((value & 0x20U) != 0 ? 0x10U : 0x00U) |
+            ((value & 0x10U) != 0 ? 0x01U : 0x00U);
+        destination[index * 4 + 2] =
+            ((value & 0x08U) != 0 ? 0x10U : 0x00U) |
+            ((value & 0x04U) != 0 ? 0x01U : 0x00U);
+        destination[index * 4 + 3] =
+            ((value & 0x02U) != 0 ? 0x10U : 0x00U) |
+            ((value & 0x01U) != 0 ? 0x01U : 0x00U);
+    }
+}
+
+esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
     if (size == 0) {
         return ESP_OK;
     }
-    if (tx_unit == nullptr || data == nullptr) {
+    if (context == nullptr || context->tx_unit == nullptr ||
+        context->encoded_buffer == nullptr || data == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }
+
+    const auto* source = static_cast<const uint8_t*>(data);
     parlio_transmit_config_t transmit_config = {};
     transmit_config.idle_value = 0;
-    esp_err_t result =
-        parlio_tx_unit_transmit(tx_unit, data, size * 8, &transmit_config);
-    if (result == ESP_OK) {
-        result = parlio_tx_unit_wait_all_done(tx_unit, 250);
+
+    while (size > 0) {
+        const size_t chunk_size = std::min(size, kSerialChunkBytes);
+        EncodeSerialBytes(source, chunk_size, context->encoded_buffer);
+        esp_err_t result = parlio_tx_unit_transmit(
+            context->tx_unit, context->encoded_buffer, chunk_size * 32,
+            &transmit_config);
+        if (result == ESP_OK) {
+            result = parlio_tx_unit_wait_all_done(context->tx_unit, 250);
+        }
+        if (result != ESP_OK) {
+            return result;
+        }
+        source += chunk_size;
+        size -= chunk_size;
     }
-    return result;
+    return ESP_OK;
 }
 
 esp_err_t FinishTransaction(ExpanderLcdIo* context, esp_err_t result) {
@@ -56,12 +104,12 @@ esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
     esp_err_t result = context->expander->SetLcdControl(true, false);
     if (result == ESP_OK && lcd_cmd >= 0) {
         const uint8_t command = static_cast<uint8_t>(lcd_cmd);
-        result = Transmit(context->tx_unit, &command, sizeof(command));
+        result = Transmit(context, &command, sizeof(command));
     }
     if (result == ESP_OK && param_size > 0) {
         result = context->expander->SetLcdControl(true, true);
         if (result == ESP_OK) {
-            result = Transmit(context->tx_unit, param, param_size);
+            result = Transmit(context, param, param_size);
         }
     }
     return FinishTransaction(context, result);
@@ -78,12 +126,12 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
         esp_err_t result = context->expander->SetLcdControl(true, false);
         if (result == ESP_OK && lcd_cmd >= 0) {
             const uint8_t command = static_cast<uint8_t>(lcd_cmd);
-            result = Transmit(context->tx_unit, &command, sizeof(command));
+            result = Transmit(context, &command, sizeof(command));
         }
         if (result == ESP_OK && color_size > 0) {
             result = context->expander->SetLcdControl(true, true);
             if (result == ESP_OK) {
-                result = Transmit(context->tx_unit, color, color_size);
+                result = Transmit(context, color, color_size);
             }
         }
         result = FinishTransaction(context, result);
@@ -131,6 +179,7 @@ esp_err_t DeleteIo(esp_lcd_panel_io_t* io) {
             result = parlio_del_tx_unit(context->tx_unit);
         }
     }
+    free(context->encoded_buffer);
     delete context;
     return result;
 }
@@ -149,6 +198,12 @@ esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
         return ESP_ERR_NO_MEM;
     }
     context->expander = expander;
+    context->encoded_buffer = static_cast<uint8_t*>(heap_caps_aligned_alloc(
+        sizeof(uint32_t), kEncodedChunkBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+    if (context->encoded_buffer == nullptr) {
+        delete context;
+        return ESP_ERR_NO_MEM;
+    }
     context->base.rx_param = RxParam;
     context->base.tx_param = TxParam;
     context->base.tx_color = TxColor;
@@ -159,7 +214,7 @@ esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
     tx_config.clk_src = PARLIO_CLK_SRC_DEFAULT;
     tx_config.clk_in_gpio_num = GPIO_NUM_NC;
     tx_config.output_clk_freq_hz = clock_hz;
-    tx_config.data_width = 1;
+    tx_config.data_width = 4;
     for (auto& gpio : tx_config.data_gpio_nums) {
         gpio = GPIO_NUM_NC;
     }
@@ -167,7 +222,7 @@ esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
     tx_config.clk_out_gpio_num = YAKA_LCD_SCLK_GPIO;
     tx_config.valid_gpio_num = GPIO_NUM_NC;
     tx_config.trans_queue_depth = 1;
-    tx_config.max_transfer_size = YAKA_LCD_WIDTH * 20 * sizeof(uint16_t);
+    tx_config.max_transfer_size = kEncodedChunkBytes;
     tx_config.dma_burst_size = 64;
     tx_config.shift_edge = PARLIO_SHIFT_EDGE_NEG;
     tx_config.bit_pack_order = PARLIO_BIT_PACK_ORDER_MSB;
@@ -180,6 +235,7 @@ esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
         if (context->tx_unit != nullptr) {
             parlio_del_tx_unit(context->tx_unit);
         }
+        free(context->encoded_buffer);
         delete context;
         return result;
     }
