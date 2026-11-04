@@ -117,12 +117,21 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("chunk_size * 32", lcd_io)
         self.assertIn("EncodeSerialBytes", lcd_io)
         self.assertIn("return result;", lcd_io)
+        self.assertIn("lcd_cmd == LCD_CMD_CASET", lcd_io)
+        self.assertIn("release_failed_flush", lcd_io)
+        self.assertIn("NotifyColorDone(context);", lcd_io)
         self.assertLess(
-            lcd_io.index("on_color_trans_done(io"),
+            lcd_io.index("NotifyColorDone(context);", lcd_io.index("esp_err_t TxColor")),
             lcd_io.index("return result;", lcd_io.index("esp_err_t TxColor")),
         )
         self.assertNotIn("size * 8, &transmit_config", lcd_io)
         self.assertIn("YAKA_TF_SCLK_GPIO GPIO_NUM_19", (BOARD_DIR / "config.h").read_text(encoding="utf-8"))
+
+    def test_pca9557_retries_transient_control_write_failures(self):
+        source = (BOARD_DIR / "hi_yaka_pca9557.cc").read_text(encoding="utf-8")
+        self.assertIn("kRegisterWriteAttempts = 3", source)
+        self.assertIn("attempt <= kRegisterWriteAttempts", source)
+        self.assertIn("i2c_master_transmit(device_, data, sizeof(data), 100)", source)
 
     def test_recording_commit_is_rejected_after_loss_or_write_failure(self):
         runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(

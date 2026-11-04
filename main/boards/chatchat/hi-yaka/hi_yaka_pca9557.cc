@@ -3,12 +3,15 @@
 #include "config.h"
 
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 
 constexpr char kTag[] = "HiYaKaPca9557";
 constexpr uint8_t kOutputPortRegister = 0x01;
 constexpr uint8_t kConfigurationRegister = 0x03;
+constexpr int kRegisterWriteAttempts = 3;
 
 }  // namespace
 
@@ -35,7 +38,19 @@ esp_err_t HiYaKaPca9557::WriteRegisterLocked(uint8_t reg, uint8_t value) {
         return ESP_ERR_INVALID_STATE;
     }
     const uint8_t data[] = {reg, value};
-    return i2c_master_transmit(device_, data, sizeof(data), 100);
+    esp_err_t result = ESP_FAIL;
+    for (int attempt = 1; attempt <= kRegisterWriteAttempts; ++attempt) {
+        result = i2c_master_transmit(device_, data, sizeof(data), 100);
+        if (result == ESP_OK) {
+            return ESP_OK;
+        }
+        if (attempt < kRegisterWriteAttempts) {
+            ESP_LOGW(kTag, "register 0x%02X write failed (%s), retry %d/%d", reg,
+                     esp_err_to_name(result), attempt + 1, kRegisterWriteAttempts);
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
+    return result;
 }
 
 esp_err_t HiYaKaPca9557::ReadRegisterLocked(uint8_t reg, uint8_t* value) {

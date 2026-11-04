@@ -9,6 +9,7 @@
 
 #include <driver/parlio_tx.h>
 #include <esp_heap_caps.h>
+#include <esp_lcd_panel_commands.h>
 #include <esp_lcd_panel_io_interface.h>
 
 namespace {
@@ -28,6 +29,7 @@ struct ExpanderLcdIo {
     uint8_t* encoded_buffer = nullptr;
     esp_lcd_panel_io_callbacks_t callbacks{};
     void* callback_context = nullptr;
+    bool flush_pending = false;
     std::mutex mutex;
 };
 
@@ -93,26 +95,53 @@ esp_err_t FinishTransaction(ExpanderLcdIo* context, esp_err_t result) {
     return result == ESP_OK ? deselect : result;
 }
 
+void NotifyColorDone(ExpanderLcdIo* context) {
+    if (context->callbacks.on_color_trans_done != nullptr) {
+        esp_lcd_panel_io_event_data_t event = {};
+        context->callbacks.on_color_trans_done(
+            &context->base, &event, context->callback_context);
+    }
+}
+
 esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
                   size_t param_size) {
     if (io == nullptr || (param_size > 0 && param == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
     auto* context = ToContext(io);
-    std::lock_guard<std::mutex> lock(context->mutex);
+    esp_err_t result = ESP_OK;
+    bool release_failed_flush = false;
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        if (lcd_cmd == LCD_CMD_CASET) {
+            // ST7789 draw_bitmap starts every LVGL flush with CASET, followed
+            // by RASET and a RAMWR color transaction. Remember that sequence
+            // so a failed parameter transfer can release LVGL even though the
+            // driver aborts before reaching TxColor.
+            context->flush_pending = true;
+        }
 
-    esp_err_t result = context->expander->SetLcdControl(true, false);
-    if (result == ESP_OK && lcd_cmd >= 0) {
-        const uint8_t command = static_cast<uint8_t>(lcd_cmd);
-        result = Transmit(context, &command, sizeof(command));
-    }
-    if (result == ESP_OK && param_size > 0) {
-        result = context->expander->SetLcdControl(true, true);
-        if (result == ESP_OK) {
-            result = Transmit(context, param, param_size);
+        result = context->expander->SetLcdControl(true, false);
+        if (result == ESP_OK && lcd_cmd >= 0) {
+            const uint8_t command = static_cast<uint8_t>(lcd_cmd);
+            result = Transmit(context, &command, sizeof(command));
+        }
+        if (result == ESP_OK && param_size > 0) {
+            result = context->expander->SetLcdControl(true, true);
+            if (result == ESP_OK) {
+                result = Transmit(context, param, param_size);
+            }
+        }
+        result = FinishTransaction(context, result);
+        if (result != ESP_OK && context->flush_pending) {
+            context->flush_pending = false;
+            release_failed_flush = true;
         }
     }
-    return FinishTransaction(context, result);
+    if (release_failed_flush) {
+        NotifyColorDone(context);
+    }
+    return result;
 }
 
 esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
@@ -136,6 +165,7 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
             }
         }
         result = FinishTransaction(context, result);
+        context->flush_pending = false;
     }
 
     // This implementation is deliberately synchronous because CS and DC are
@@ -144,10 +174,7 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
     // LVGL must receive the flush-complete callback even when the underlying
     // transfer fails. Otherwise lv_refr waits forever and taskLVGL starves the
     // idle task. The return value still preserves the transport failure.
-    if (context->callbacks.on_color_trans_done != nullptr) {
-        esp_lcd_panel_io_event_data_t event = {};
-        context->callbacks.on_color_trans_done(io, &event, context->callback_context);
-    }
+    NotifyColorDone(context);
     return result;
 }
 
