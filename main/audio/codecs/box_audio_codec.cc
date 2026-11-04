@@ -12,7 +12,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
                              uint8_t es7210_addr, bool input_reference, float input_gain,
                              int reference_gain_channel, float reference_gain,
                              i2c_port_t i2c_port, uint32_t es7210_mic_mask,
-                             bool output_path_enabled) {
+                             bool speaker_pa_enabled) {
     duplex_ = true;                              // 是否双工
     input_reference_ = input_reference;          // 是否使用参考输入，实现回声消除
     input_channels_ = input_reference_ ? 2 : 1;  // 输入通道数
@@ -21,7 +21,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     input_gain_ = input_gain;
     reference_gain_channel_ = reference_gain_channel;
     reference_gain_ = reference_gain;
-    output_path_enabled_ = output_path_enabled;
+    speaker_pa_enabled_ = speaker_pa_enabled;
 
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
 
@@ -50,7 +50,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es8311_cfg.ctrl_if = out_ctrl_if_;
     es8311_cfg.gpio_if = gpio_if_;
     es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC;
-    es8311_cfg.pa_pin = output_path_enabled_ ? pa_pin : GPIO_NUM_NC;
+    es8311_cfg.pa_pin = speaker_pa_enabled_ ? pa_pin : GPIO_NUM_NC;
     es8311_cfg.use_mclk = true;
     es8311_cfg.hw_gain.pa_voltage = 5.0;
     es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
@@ -81,8 +81,8 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     input_dev_ = esp_codec_dev_new(&dev_cfg);
     assert(input_dev_ != NULL);
 
-    ESP_LOGI(TAG, "BoxAudioDevice initialized (output_path=%s)",
-             output_path_enabled_ ? "enabled" : "disabled");
+    ESP_LOGI(TAG, "BoxAudioDevice initialized (speaker_pa=%s)",
+             speaker_pa_enabled_ ? "enabled" : "disabled");
 }
 
 BoxAudioCodec::~BoxAudioCodec() {
@@ -190,10 +190,6 @@ void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
 }
 
 void BoxAudioCodec::SetOutputVolume(int volume) {
-    if (!output_path_enabled_) {
-        AudioCodec::SetOutputVolume(volume);
-        return;
-    }
     ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(output_dev_, volume));
     AudioCodec::SetOutputVolume(volume);
 }
@@ -232,13 +228,6 @@ void BoxAudioCodec::EnableInput(bool enable) {
 
 void BoxAudioCodec::EnableOutput(bool enable) {
     std::lock_guard<std::mutex> lock(data_if_mutex_);
-    if (!output_path_enabled_) {
-        if (enable && !output_suppression_logged_) {
-            ESP_LOGW(TAG, "output request suppressed by board safety policy");
-            output_suppression_logged_ = true;
-        }
-        return;
-    }
     if (enable == output_enabled_) {
         return;
     }
@@ -267,8 +256,16 @@ int BoxAudioCodec::Read(int16_t* dest, int samples) {
 }
 
 int BoxAudioCodec::Write(const int16_t* data, int samples) {
-    if (output_path_enabled_ && output_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t)));
+    if (output_enabled_) {
+        const esp_err_t result =
+            esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(result);
+        if (result == ESP_OK && !digital_output_observed_ && samples > 0) {
+            ESP_LOGI(TAG,
+                     "digital audio write verified: samples=%d speaker_pa=%s",
+                     samples, speaker_pa_enabled_ ? "enabled" : "disabled");
+            digital_output_observed_ = true;
+        }
     }
     return samples;
 }

@@ -290,7 +290,7 @@ private:
             YAKA_ES8311_I2C_ADDRESS, YAKA_ES7210_I2C_ADDRESS, true, 24.0f, 2, 0.0f,
             YAKA_I2C_PORT, ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false);
         ESP_LOGW(TAG,
-                 "capture-only audio candidate enabled; speaker/PA output is hard-disabled");
+                 "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
     }
 #endif
 
