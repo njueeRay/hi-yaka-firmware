@@ -33,7 +33,9 @@
 // PCA9557 register contract. Configuration bit: 1=input, 0=output.
 // Outputs in M1: IO0 LCD_BL, IO1 LCD_RST, IO2 MOTOR_CTRL,
 // IO6 LCD_CS, IO7 LCD_DC. IO3/IO4/IO5 remain inputs.
-// Safe values: backlight off, LCD held in reset, motor off, LCD CS inactive.
+// IO0 is open-drain. This board omitted the LCD_BL pull-up, so releasing IO0
+// does not turn on the backlight; a hardware fix is required (see bring-up log).
+// Safe values: IO0 actively low, LCD held in reset, motor off, LCD CS inactive.
 #define YAKA_PCA9557_SAFE_OUTPUT 0x40
 #define YAKA_PCA9557_SAFE_CONFIGURATION 0x38
 
