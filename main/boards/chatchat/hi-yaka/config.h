@@ -23,6 +23,12 @@
 #define YAKA_ES7210_I2C_ADDRESS 0x41
 #define YAKA_QMI8658A_I2C_ADDRESS 0x6A
 
+// esp_codec_dev retains the codec datasheet's 8-bit address convention and
+// shifts this value right before registering an IDF 7-bit I2C device. Keep
+// these values separate from the 7-bit addresses used by i2c_master_probe().
+#define YAKA_ES8311_CODEC_ADDRESS (YAKA_ES8311_I2C_ADDRESS << 1)
+#define YAKA_ES7210_CODEC_ADDRESS (YAKA_ES7210_I2C_ADDRESS << 1)
+
 // PCA9557 register contract. Configuration bit: 1=input, 0=output.
 // Outputs in M1: IO0 LCD_BL, IO1 LCD_RST, IO2 MOTOR_CTRL,
 // IO6 LCD_CS, IO7 LCD_DC. IO3/IO4/IO5 remain inputs.

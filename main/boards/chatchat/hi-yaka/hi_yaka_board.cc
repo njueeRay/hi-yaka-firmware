@@ -410,7 +410,7 @@ private:
             i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             YAKA_AUDIO_MCLK_GPIO, YAKA_AUDIO_BCLK_GPIO, YAKA_AUDIO_WS_GPIO,
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
-            YAKA_ES8311_I2C_ADDRESS, YAKA_ES7210_I2C_ADDRESS, true, 24.0f, 2, 0.0f,
+            YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS, true, 24.0f, 2, 0.0f,
             YAKA_I2C_PORT, ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false);
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");

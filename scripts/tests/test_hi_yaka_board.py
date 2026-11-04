@@ -52,6 +52,12 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         }
         for name, value in expected.items():
             self.assertRegex(header, rf"#define\s+{name}\s+{re.escape(value)}")
+        self.assertIn(
+            "YAKA_ES8311_CODEC_ADDRESS (YAKA_ES8311_I2C_ADDRESS << 1)", header
+        )
+        self.assertIn(
+            "YAKA_ES7210_CODEC_ADDRESS (YAKA_ES7210_I2C_ADDRESS << 1)", header
+        )
 
     def test_pca9557_safe_write_precedes_direction_change(self):
         source = (BOARD_DIR / "hi_yaka_pca9557.cc").read_text(encoding="utf-8")
@@ -87,6 +93,7 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("DummyAudioCodec", source)
         self.assertIn("PA safety interlock active", source)
         self.assertIn("ES7210_SEL_MIC1 | ES7210_SEL_MIC3, false", source)
+        self.assertIn("YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS", source)
 
     def test_lcd_does_not_consume_the_only_user_spi_controller(self):
         lcd_io = (BOARD_DIR / "hi_yaka_expander_lcd_io.cc").read_text(encoding="utf-8")
