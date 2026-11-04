@@ -104,6 +104,33 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("dropped_blocks_.load() != 0", runtime)
         self.assertIn("port->AbortRecording()", runtime)
 
+    def test_auxiliary_drivers_are_real_and_bounded(self):
+        config = json.loads((BOARD_DIR / "config.json").read_text(encoding="utf-8"))
+        lab_options = set(config["builds"][1]["sdkconfig_append"])
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y", lab_options)
+
+        manifest = (ROOT / "main" / "idf_component.yml").read_text(encoding="utf-8")
+        self.assertIn("jef-sure/pn532: ==0.8.2", manifest)
+
+        pn532 = (BOARD_DIR / "hi_yaka_pn532.cc").read_text(encoding="utf-8")
+        self.assertIn("pn532_i2c_attach", pn532)
+        self.assertIn("pn532_14443_get_all_uids_ex", pn532)
+        self.assertIn("pn532_set_rf_off", pn532)
+        self.assertIn("GPIO_NUM_NC, GPIO_NUM_NC", pn532)
+
+        imu = (BOARD_DIR / "hi_yaka_qmi8658a.cc").read_text(encoding="utf-8")
+        self.assertIn("kExpectedWhoAmI = 0x05", imu)
+        self.assertIn("kResetCommand = 0xB0", imu)
+        self.assertIn("kAccel4g112Hz = 0x16", imu)
+        self.assertIn("kGyro512dps112Hz = 0x56", imu)
+        self.assertIn("ESP_ERR_TIMEOUT", imu)
+
+        runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("BoardBeginNfcScan()", runtime)
+        self.assertIn("SetBoardImuMonitoring(enabled)", runtime)
+
 
 if __name__ == "__main__":
     unittest.main()

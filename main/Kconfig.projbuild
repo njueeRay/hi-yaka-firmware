@@ -1195,8 +1195,13 @@ menu "HiYaKa pre-board laboratory features"
         default n
 
     config HI_YAKA_ENABLE_AUXILIARY_SENSORS
-        bool "Enable bounded PN532/QMI8658 polling candidates"
+        bool "Enable PN532 and QMI8658A polling drivers"
         default n
+        help
+            Enable the PN532 ISO14443A read-only path and QMI8658A six-axis
+            sampling path. HiYaKa has no IRQ connection for either device and
+            no MCU-controlled PN532 reset, so both drivers use bounded polling
+            and fail independently without blocking startup.
 
     config HI_YAKA_ENABLE_PRODUCT_RUNTIME
         bool "Bind HiYaKa product runtime to the upstream application"

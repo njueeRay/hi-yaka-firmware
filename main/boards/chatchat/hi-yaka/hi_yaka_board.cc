@@ -10,12 +10,15 @@
 #include "hi_yaka_feedback.h"
 #include "hi_yaka_input.h"
 #include "hi_yaka_pca9557.h"
+#include "hi_yaka_pn532.h"
+#include "hi_yaka_qmi8658a.h"
 #include "hi_yaka_storage.h"
 #include "recording_store.h"
 #include "runtime_adapter.h"
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <inttypes.h>
 #include <memory>
@@ -30,6 +33,7 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <sdkconfig.h>
@@ -67,6 +71,36 @@ const char* PhysicalKeyName(hi_yaka::PhysicalKey key) {
     return index < kNames.size() ? kNames[index] : "UNKNOWN";
 }
 
+const char* NfcPollResultName(HiYaKaNfcPollResult result) {
+    switch (result) {
+        case HiYaKaNfcPollResult::kFound:
+            return "found";
+        case HiYaKaNfcPollResult::kNoTarget:
+            return "no-target";
+        case HiYaKaNfcPollResult::kTimeout:
+            return "timeout";
+        case HiYaKaNfcPollResult::kTransportError:
+            return "transport-error";
+        case HiYaKaNfcPollResult::kProtocolError:
+            return "protocol-error";
+        case HiYaKaNfcPollResult::kNoMemory:
+            return "no-memory";
+        case HiYaKaNfcPollResult::kInvalidState:
+            return "invalid-state";
+    }
+    return "unknown";
+}
+
+uint32_t NfcUidFingerprint(const HiYaKaNfcTag& tag) {
+    // FNV-1a is deliberately non-reversible in normal logs. The full UID is
+    // retained only in RAM for the future approved business mapping.
+    uint32_t hash = 2166136261U;
+    for (uint8_t index = 0; index < tag.uid_length; ++index) {
+        hash = (hash ^ tag.uid[index]) * 16777619U;
+    }
+    return hash;
+}
+
 class ExpanderBacklight final : public Backlight {
 public:
     explicit ExpanderBacklight(HiYaKaPca9557& expander) : expander_(expander) {}
@@ -98,9 +132,15 @@ private:
     std::unique_ptr<HiYaKaFeedback> feedback_;
     std::unique_ptr<BoxAudioCodec> audio_codec_;
     std::unique_ptr<HiYaKaStorage> storage_;
+    std::unique_ptr<HiYaKaPn532> pn532_;
+    std::unique_ptr<HiYaKaQmi8658a> qmi8658a_;
     std::unique_ptr<hi_yaka::RecordingStore> recording_store_;
     std::unique_ptr<hi_yaka::RecordingStoragePortAdapter> recording_port_;
     bool pca_safe_state_verified_ = false;
+    std::atomic<bool> nfc_scan_running_{false};
+    std::atomic<bool> nfc_scan_cancelled_{false};
+    std::atomic<bool> imu_monitoring_{false};
+    std::atomic<bool> imu_task_running_{false};
 
     void ForcePaDisabled() {
         gpio_config_t config = {};
@@ -246,6 +286,38 @@ private:
             YAKA_LCD_OFFSET_Y, false, false, false);
         backlight_ = std::make_unique<ExpanderBacklight>(*pca9557_);
         ESP_LOGW(TAG, "LCD candidate enabled: orientation/color/inversion require L1 verification");
+    }
+#endif
+
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+    void InitializeAuxiliarySensors() {
+        const esp_err_t imu_probe =
+            i2c_master_probe(i2c_bus_, YAKA_QMI8658A_I2C_ADDRESS, 100);
+        if (imu_probe == ESP_OK) {
+            qmi8658a_ = std::make_unique<HiYaKaQmi8658a>(i2c_bus_);
+            const esp_err_t result = qmi8658a_->Initialize();
+            if (result != ESP_OK) {
+                ESP_LOGE(TAG, "QMI8658A initialization failed: %s", esp_err_to_name(result));
+                qmi8658a_.reset();
+            }
+        } else {
+            ESP_LOGW(TAG, "QMI8658A unavailable at 0x%02X: %s",
+                     YAKA_QMI8658A_I2C_ADDRESS, esp_err_to_name(imu_probe));
+        }
+
+        const esp_err_t nfc_probe =
+            i2c_master_probe(i2c_bus_, YAKA_PN532_I2C_ADDRESS, 100);
+        if (nfc_probe == ESP_OK) {
+            pn532_ = std::make_unique<HiYaKaPn532>(i2c_bus_);
+            const esp_err_t result = pn532_->Initialize();
+            if (result != ESP_OK) {
+                ESP_LOGE(TAG, "PN532 initialization failed: %s", esp_err_to_name(result));
+                pn532_.reset();
+            }
+        } else {
+            ESP_LOGW(TAG, "PN532 unavailable at 0x%02X: %s",
+                     YAKA_PN532_I2C_ADDRESS, esp_err_to_name(nfc_probe));
+        }
     }
 #endif
 
@@ -405,11 +477,38 @@ private:
                              energy / samples.size());
                 }
 
+                if (self->qmi8658a_ != nullptr) {
+                    HiYaKaImuSample sample{};
+                    const esp_err_t result = self->qmi8658a_->ReadSample(&sample, 200);
+                    ESP_LOGI(TAG,
+                             "BRINGUP IMU: result=%s accel_g=[%.3f %.3f %.3f] gyro_dps=[%.2f %.2f %.2f] temp=%.2fC",
+                             esp_err_to_name(result), sample.acceleration_g[0],
+                             sample.acceleration_g[1], sample.acceleration_g[2],
+                             sample.angular_rate_dps[0], sample.angular_rate_dps[1],
+                             sample.angular_rate_dps[2], sample.temperature_c);
+                }
+
+                if (self->pn532_ != nullptr) {
+                    HiYaKaNfcTag tag{};
+                    const HiYaKaNfcPollResult result =
+                        self->pn532_->PollIso14443A(&tag, 1000);
+                    if (result == HiYaKaNfcPollResult::kFound) {
+                        ESP_LOGI(TAG,
+                                 "BRINGUP NFC: result=found targets=%u uid_length=%u fingerprint=%08" PRIx32 " ATQA=%04X SAK=%02X",
+                                 tag.target_count, tag.uid_length, NfcUidFingerprint(tag),
+                                 tag.atqa, tag.sak);
+                    } else {
+                        ESP_LOGI(TAG, "BRINGUP NFC: result=%s",
+                                 NfcPollResultName(result));
+                    }
+                    self->pn532_->SetRfOff();
+                }
+
                 ESP_LOGI(TAG,
                          "BRINGUP READY: press UP/DOWN/LEFT/RIGHT/CONFIRM/BACK/KEY_A/KEY_B one at a time");
                 vTaskDelete(nullptr);
             },
-            "hi_yaka_diag", 4096, this, 4, nullptr);
+            "hi_yaka_diag", 6144, this, 4, nullptr);
         if (created != pdPASS) {
             ESP_LOGE(TAG, "failed to start bounded bring-up diagnostics");
         }
@@ -440,6 +539,9 @@ public:
 #endif
 #if CONFIG_HI_YAKA_ENABLE_STORAGE
         InitializeStorage();
+#endif
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        InitializeAuxiliarySensors();
 #endif
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
         StartBringupDiagnostics();
@@ -507,12 +609,14 @@ public:
                 return recording_port_ != nullptr;
             case hi_yaka::CapabilityId::kNetwork:
                 return true;
+            case hi_yaka::CapabilityId::kNfc:
+                return pn532_ != nullptr && pn532_->ready();
+            case hi_yaka::CapabilityId::kImu:
+                return qmi8658a_ != nullptr && qmi8658a_->ready();
             case hi_yaka::CapabilityId::kFeedback:
                 return feedback_ != nullptr;
             case hi_yaka::CapabilityId::kPower:
                 return true;
-            case hi_yaka::CapabilityId::kNfc:
-            case hi_yaka::CapabilityId::kImu:
             case hi_yaka::CapabilityId::kUpdate:
             case hi_yaka::CapabilityId::kCount:
                 return false;
@@ -524,6 +628,110 @@ public:
         if (input_ != nullptr) {
             input_->SetEnabled(enabled);
         }
+    }
+
+    bool BeginNfcScan() {
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        if (pn532_ == nullptr || !pn532_->ready()) {
+            return false;
+        }
+        bool expected = false;
+        if (!nfc_scan_running_.compare_exchange_strong(expected, true)) {
+            return false;
+        }
+        nfc_scan_cancelled_.store(false);
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                bool found = false;
+                HiYaKaNfcTag tag{};
+                HiYaKaNfcPollResult result = HiYaKaNfcPollResult::kNoTarget;
+                const int64_t deadline_us = esp_timer_get_time() + 10LL * 1000 * 1000;
+                while (!self->nfc_scan_cancelled_.load() &&
+                       esp_timer_get_time() < deadline_us) {
+                    result = self->pn532_->PollIso14443A(&tag, 250);
+                    if (result == HiYaKaNfcPollResult::kFound) {
+                        found = true;
+                        break;
+                    }
+                    if (result == HiYaKaNfcPollResult::kTransportError ||
+                        result == HiYaKaNfcPollResult::kProtocolError ||
+                        result == HiYaKaNfcPollResult::kNoMemory) {
+                        break;
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                }
+                self->pn532_->SetRfOff();
+                const bool cancelled = self->nfc_scan_cancelled_.load();
+                if (found) {
+                    ESP_LOGI(TAG,
+                             "NFC tag: targets=%u uid_length=%u fingerprint=%08" PRIx32 " ATQA=%04X SAK=%02X",
+                             tag.target_count, tag.uid_length, NfcUidFingerprint(tag),
+                             tag.atqa, tag.sak);
+                } else {
+                    ESP_LOGI(TAG, "NFC scan ended: result=%s cancelled=%d",
+                             NfcPollResultName(result), cancelled);
+                }
+                self->nfc_scan_running_.store(false);
+                if (!cancelled) {
+                    Application::GetInstance().Schedule([found]() {
+                        hi_yaka::RuntimeAdapter::Get().OnNfcScanCompleted(found);
+                    });
+                }
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_nfc", 6144, this, 4, nullptr);
+        if (created != pdPASS) {
+            nfc_scan_running_.store(false);
+            return false;
+        }
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    void CancelNfcScan() { nfc_scan_cancelled_.store(true); }
+
+    void SetImuMonitoring(bool enabled) {
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        imu_monitoring_.store(enabled);
+        if (!enabled || qmi8658a_ == nullptr || !qmi8658a_->ready()) {
+            return;
+        }
+        bool expected = false;
+        if (!imu_task_running_.compare_exchange_strong(expected, true)) {
+            return;
+        }
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                unsigned sample_index = 0;
+                while (self->imu_monitoring_.load()) {
+                    HiYaKaImuSample sample{};
+                    const esp_err_t result = self->qmi8658a_->ReadSample(&sample, 100);
+                    if (result != ESP_OK) {
+                        ESP_LOGW(TAG, "IMU monitor read failed: %s", esp_err_to_name(result));
+                    } else if ((sample_index++ % 10) == 0) {
+                        ESP_LOGI(TAG,
+                                 "IMU monitor: accel_g=[%.3f %.3f %.3f] gyro_dps=[%.2f %.2f %.2f]",
+                                 sample.acceleration_g[0], sample.acceleration_g[1],
+                                 sample.acceleration_g[2], sample.angular_rate_dps[0],
+                                 sample.angular_rate_dps[1], sample.angular_rate_dps[2]);
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                }
+                self->imu_task_running_.store(false);
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_imu", 4096, this, 3, nullptr);
+        if (created != pdPASS) {
+            imu_task_running_.store(false);
+            imu_monitoring_.store(false);
+        }
+#else
+        (void)enabled;
+#endif
     }
 
     hi_yaka::RecordingStoragePortAdapter* RecordingPort() {
@@ -555,6 +763,18 @@ bool BoardCapabilityReady(CapabilityId capability) {
 
 void SetBoardInputEnabled(bool enabled) {
     static_cast<HiYaKaBoard&>(Board::GetInstance()).SetInputEnabled(enabled);
+}
+
+bool BoardBeginNfcScan() {
+    return static_cast<HiYaKaBoard&>(Board::GetInstance()).BeginNfcScan();
+}
+
+void BoardCancelNfcScan() {
+    static_cast<HiYaKaBoard&>(Board::GetInstance()).CancelNfcScan();
+}
+
+void SetBoardImuMonitoring(bool enabled) {
+    static_cast<HiYaKaBoard&>(Board::GetInstance()).SetImuMonitoring(enabled);
 }
 
 RecordingStoragePortAdapter* BoardRecordingPort() {

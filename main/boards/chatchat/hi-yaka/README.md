@@ -35,7 +35,12 @@
 - `hi-yaka-lab`：编译 ST7789/PARLIO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs 和产品运行时；
 - LCD 使用 PARLIO GPIO6/7，TF 独占 SPI2 GPIO15/18/19/20，避免争用 ESP32-C6 唯一用户 SPI 控制器；
 - 本地录音复用 AudioService 单一 I²S RX 所有者，经容量 12 的有界队列交给独立写卡任务；
-- PN532/QMI8658A 当前只进入地址探测和能力降级，不含 M6 产品业务；
+- PN532 已具备固件版本校验、SAM 初始化、有界 ISO14443A 轮询、UID/ATQA/SAK
+  读取、超时分类和 RF 关闭；日志仅输出 UID 指纹，不输出完整 UID；
+- QMI8658A 已具备身份校验、软复位、约 112 Hz 六轴初始化、数据就绪轮询、
+  温度/加速度/角速度读取与物理量换算；板级轴向仍须通过六面实测冻结；
+- 两者都没有硬件 IRQ；PN532 也没有 MCU 可控复位，因此不声明深睡唤醒或
+  独立硬复位恢复能力。具体 NFC 业务映射仍属于 M6 产品决策；
 - 全部参数仍须按 `docs/bringup/PREBOARD_ADAPTER_STATUS.md` 逐项取得 L1/L2 证据。
 
 ## 构建
