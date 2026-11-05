@@ -28,16 +28,17 @@ constexpr std::size_t kSamplesPerBlock = 512;
 i2s_std_config_t MakeStandardConfig(gpio_num_t din) {
     i2s_std_config_t config = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(kSampleRate),
-        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
-                                                        I2S_SLOT_MODE_STEREO),
-        .gpio_cfg = {
-            .mclk = YAKA_AUDIO_MCLK_GPIO,
-            .bclk = YAKA_AUDIO_BCLK_GPIO,
-            .ws = YAKA_AUDIO_WS_GPIO,
-            .dout = din == YAKA_AUDIO_DOUT_GPIO ? YAKA_AUDIO_DOUT_GPIO : I2S_GPIO_UNUSED,
-            .din = din,
-            .invert_flags = {},
-        },
+        .slot_cfg =
+            I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+        .gpio_cfg =
+            {
+                .mclk = YAKA_AUDIO_MCLK_GPIO,
+                .bclk = YAKA_AUDIO_BCLK_GPIO,
+                .ws = YAKA_AUDIO_WS_GPIO,
+                .dout = din == YAKA_AUDIO_DOUT_GPIO ? YAKA_AUDIO_DOUT_GPIO : I2S_GPIO_UNUSED,
+                .din = din,
+                .invert_flags = {},
+            },
     };
     return config;
 }
@@ -73,9 +74,12 @@ void RunInternalLoopback() {
     // drive GPIO13, which is connected to the ES7210 digital output.
     const i2s_std_config_t config = MakeStandardConfig(YAKA_AUDIO_DOUT_GPIO);
     result = i2s_channel_init_std_mode(tx, &config);
-    if (result == ESP_OK) result = i2s_channel_init_std_mode(rx, &config);
-    if (result == ESP_OK) result = i2s_channel_enable(tx);
-    if (result == ESP_OK) result = i2s_channel_enable(rx);
+    if (result == ESP_OK)
+        result = i2s_channel_init_std_mode(rx, &config);
+    if (result == ESP_OK)
+        result = i2s_channel_enable(tx);
+    if (result == ESP_OK)
+        result = i2s_channel_enable(rx);
     if (result != ESP_OK) {
         ESP_LOGE(kTag, "A internal loopback setup failed: %s", esp_err_to_name(result));
         StopAndDelete(rx);
@@ -95,12 +99,13 @@ void RunInternalLoopback() {
     for (int pass = 0; pass < 8; ++pass) {
         std::size_t written = 0;
         std::size_t read = 0;
-        io_result = i2s_channel_write(tx, sent.data(), sizeof(sent), &written,
-                                      pdMS_TO_TICKS(300));
-        if (io_result != ESP_OK || written != sizeof(sent)) break;
-        io_result = i2s_channel_read(rx, received.data(), sizeof(received), &read,
-                                     pdMS_TO_TICKS(300));
-        if (io_result != ESP_OK) break;
+        io_result = i2s_channel_write(tx, sent.data(), sizeof(sent), &written, pdMS_TO_TICKS(300));
+        if (io_result != ESP_OK || written != sizeof(sent))
+            break;
+        io_result =
+            i2s_channel_read(rx, received.data(), sizeof(received), &read, pdMS_TO_TICKS(300));
+        if (io_result != ESP_OK)
+            break;
         total_received += read / sizeof(int16_t);
         for (std::size_t i = 0; i < read / sizeof(int16_t); ++i) {
             matching_words += received[i] == static_cast<int16_t>(0x1357) ||
@@ -145,21 +150,21 @@ void RunRxOnly(i2c_master_bus_handle_t i2c_bus) {
     es7210_codec_cfg_t codec_config = {};
     codec_config.ctrl_if = ctrl_if;
     codec_config.mic_selected = ES7210_SEL_MIC1 | ES7210_SEL_MIC2;
-    const audio_codec_if_t* codec_if = ctrl_if == nullptr ? nullptr : es7210_codec_new(&codec_config);
+    const audio_codec_if_t* codec_if =
+        ctrl_if == nullptr ? nullptr : es7210_codec_new(&codec_config);
     esp_codec_dev_cfg_t dev_config = {
         .dev_type = ESP_CODEC_DEV_TYPE_IN,
         .codec_if = codec_if,
         .data_if = data_if,
     };
-    esp_codec_dev_handle_t dev = data_if == nullptr || codec_if == nullptr
-                                     ? nullptr : esp_codec_dev_new(&dev_config);
+    esp_codec_dev_handle_t dev =
+        data_if == nullptr || codec_if == nullptr ? nullptr : esp_codec_dev_new(&dev_config);
     int open_result = -1;
     if (dev != nullptr) {
         esp_codec_dev_sample_info_t sample_info = {
             .bits_per_sample = 16,
             .channel = 2,
-            .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0) |
-                            ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1),
+            .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0) | ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1),
             .sample_rate = kSampleRate,
             .mclk_multiple = 0,
         };
@@ -173,8 +178,8 @@ void RunRxOnly(i2c_master_bus_handle_t i2c_bus) {
     if (open_result == ESP_CODEC_DEV_OK) {
         vTaskDelay(pdMS_TO_TICKS(100));
         std::array<int16_t, kSamplesPerBlock> samples{};
-        read_result = i2s_channel_read(rx, samples.data(), sizeof(samples), &bytes_read,
-                                       pdMS_TO_TICKS(300));
+        read_result =
+            i2s_channel_read(rx, samples.data(), sizeof(samples), &bytes_read, pdMS_TO_TICKS(300));
         if (read_result == ESP_OK) {
             for (std::size_t i = 0; i < bytes_read / sizeof(int16_t); ++i) {
                 nonzero += samples[i] != 0;
@@ -182,17 +187,21 @@ void RunRxOnly(i2c_master_bus_handle_t i2c_bus) {
             }
         }
     }
-    ESP_LOGI(kTag, "B ES7210 RX-only: open=%d read=%s bytes=%u nonzero=%u peak=%d",
-             open_result, esp_err_to_name(read_result), static_cast<unsigned>(bytes_read),
+    ESP_LOGI(kTag, "B ES7210 RX-only: open=%d read=%s bytes=%u nonzero=%u peak=%d", open_result,
+             esp_err_to_name(read_result), static_cast<unsigned>(bytes_read),
              static_cast<unsigned>(nonzero), peak);
 
     if (dev != nullptr) {
-        if (open_result == ESP_CODEC_DEV_OK) esp_codec_dev_close(dev);
+        if (open_result == ESP_CODEC_DEV_OK)
+            esp_codec_dev_close(dev);
         esp_codec_dev_delete(dev);
     }
-    if (codec_if != nullptr) audio_codec_delete_codec_if(codec_if);
-    if (ctrl_if != nullptr) audio_codec_delete_ctrl_if(ctrl_if);
-    if (data_if != nullptr) audio_codec_delete_data_if(data_if);
+    if (codec_if != nullptr)
+        audio_codec_delete_codec_if(codec_if);
+    if (ctrl_if != nullptr)
+        audio_codec_delete_ctrl_if(ctrl_if);
+    if (data_if != nullptr)
+        audio_codec_delete_data_if(data_if);
     StopAndDelete(rx);
 }
 
