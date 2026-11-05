@@ -33,6 +33,7 @@
 
 - `hi-yaka`：保持上述 M1 安全基线，所有未验证外设默认关闭；
 - `hi-yaka-lab`：编译 ST7789/PARLIO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs 和产品运行时；
+- `hi-yaka-lab-audio-ab`：无屏幕实验构建，开机先做 GPIO1 内部 I²S 回环，再做 ES7210 单独 RX 采样，随后进入常规双工录音流程；仅用于缩小麦克风全零的故障范围，不作为产品固件；
 - LCD 使用 PARLIO GPIO6/7，TF 独占 SPI2 GPIO15/18/19/20，避免争用 ESP32-C6 唯一用户 SPI 控制器；
 - 本地录音复用 AudioService 单一 I²S RX 所有者，经容量 12 的有界队列交给独立写卡任务；
 - PN532 已具备固件版本校验、SAM 初始化、有界 ISO14443A 轮询、UID/ATQA/SAK

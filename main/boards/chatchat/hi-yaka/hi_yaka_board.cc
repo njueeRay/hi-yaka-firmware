@@ -6,6 +6,7 @@
 #include "config.h"
 #include "display/lcd_display.h"
 #include "hi_yaka_adc.h"
+#include "hi_yaka_audio_ab.h"
 #include "hi_yaka_expander_lcd_io.h"
 #include "hi_yaka_feedback.h"
 #include "hi_yaka_input.h"
@@ -471,6 +472,10 @@ private:
                      esp_err_to_name(output_probe), esp_err_to_name(input_probe));
             return;
         }
+
+#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
+        HiYaKaRunAudioAbDiagnostics(i2c_bus_);
+#endif
 
         // Lab builds isolate both physical microphones on a standard stereo
         // frame. This distinguishes a TDM/clock mismatch from a dead SDOUT1

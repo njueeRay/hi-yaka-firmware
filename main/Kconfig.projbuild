@@ -1213,6 +1213,17 @@ menu "HiYaKa pre-board laboratory features"
         help
             Run one bounded, low-energy diagnostic sequence for first-board
             validation. The sequence never enables the speaker/PA output path.
+
+    config HI_YAKA_AUDIO_AB_DIAGNOSTICS
+        bool "Run isolated I2S loopback and ES7210 RX-only A/B probes"
+        depends on HI_YAKA_ENABLE_AUDIO && HI_YAKA_BRINGUP_DIAGNOSTICS
+        default n
+        help
+            Laboratory-only boot probes. First loop TX data back into RX on
+            GPIO1, which terminates at the ES8311 digital input. Then sample
+            ES7210 with a receive-only I2S channel before normal duplex audio
+            starts. GPIO13 is never driven by the loopback probe and the
+            speaker amplifier remains disabled.
 endmenu
 
 menu "TAIJIPAI_S3_CONFIG"
