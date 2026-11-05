@@ -4,7 +4,7 @@
 > 适用对象：ChatChat HiYaKa / ESP32-C6
 > 证据边界：本目录提供操作顺序、判定门槛和记录工具，不代表任何实板项目已经通过
 
-> **2026-11-04 P0 阻断：**当前同批样机不得直接按原手册上电。必须先按[U11 异常发热失效复盘与现板恢复方案](../hardware/HIYAKA_U11_THERMAL_INCIDENT_AND_RECOVERY.md)拆除 U11、隔离 CTRL，或完成经批准的等效返修，再创建新的证据 run。未返修样机的 `power` 与 `flash` 状态均为 `BLOCKED`。
+> **2026-11-04 P0 阻断：**未隔离 U11 BOOST 的样机不得直接按原手册上电。按[U11 异常发热失效复盘与现板恢复方案](../hardware/HIYAKA_U11_THERMAL_INCIDENT_AND_RECOVERY.md)处理；已拆 L7 的开发样机只允许在功放禁用、扬声器空置、有人监测温度的条件下验证非功放功能，不能据此关闭 P0。未隔离样机的 `power` 与 `flash` 状态均为 `BLOCKED`。
 
 ## 1. 目的
 
@@ -16,6 +16,12 @@
 - [模块测试矩阵](MODULE_TEST_MATRIX.md)：显示、输入、音频、TF、NFC、IMU、反馈、电量、网络、OTA 和长稳；
 - [证据等级与里程碑矩阵](EVIDENCE_LEVEL_MATRIX.md)：L0–L3 与 M1–M7 的关闭条件；
 - [实板前适配状态与首板启用顺序](PREBOARD_ADAPTER_STATUS.md)：安全构建、实验构建、M2–M5 L0 适配与逐项启用顺序；
+- [2026-11-04 LCD、PN532 与麦克风专项诊断](2026-11-04-lcd-nfc-mic-investigation.md)：首板实测、当前根因分层和下一步测量；
+- [2026-11-05 换入样机复测](2026-11-05-replacement-board-retest.md)：空 Flash 完整烧录、三项缺陷复现、TF/按键与恢复镜像；
+- [HIYAKA-LCD-INC-001 显示屏完全无背光](HIYAKA_LCD_BACKLIGHT_INCIDENT.md)：已定位的背光控制缺陷、返修路径与画面验收；
+- [HIYAKA-NFC-INC-001 PN532 无 I²C 应答](HIYAKA_NFC_NO_ACK_INCIDENT.md)：根因待定的分层测量与关闭条件；
+- [2026-11-05 NFC 主机接口 A/B 实板记录](2026-11-05-nfc-interface-ab-results.md)：旧版 HSU 与当前 I²C 对照、独立诊断镜像及原镜像恢复；
+- [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)：现象、逐层排查、解决路径与关闭条件；
 - `scripts/hi_yaka_evidence.py`：生成、记录和校验样机证据包。
 
 ## 2. 不可跳过的身份绑定

@@ -8,7 +8,7 @@
 
 Velxio 可以作为 HiYaKa 的**可选 L0.5 虚拟行为测试通道**，适合硬件到位前验证 ESP32-C6 基础启动、UART、部分 GPIO/I²C/SPI 行为、UI/状态机和故障注入。它不能替代 HiYaKa 的 ESP-IDF 6.1 构建真值，也不能替代音频、射频、电源、NFC 场强、显示电气和整机验证。
 
-最合理的使用方式不是把 HiYaKa 工程迁入 Velxio，也不是维护一套“仿真专用固件”，而是：继续在 Raynode 用固定 ESP-IDF 6.1 构建；把同一份 merged flash image 送入 Velxio；只为外设行为建立薄模型；任何为了仿真而产生的条件分支都必须能证明不会污染实机路径。
+最合理的使用方式不是把 HiYaKa 工程迁入 Velxio，也不是维护一套“仿真专用固件”，而是：继续在 `aliyun_raynode` 用固定 ESP-IDF 6.1 构建；把同一份 merged flash image 送入 Velxio；只为外设行为建立薄模型；任何为了仿真而产生的条件分支都必须能证明不会污染实机路径。
 
 当前不建议直接将 Velxio 作为正式依赖。先做一次有明确退出条件的短周期 spike；若同一固件镜像、I²C/PCA9557 安全顺序或故障注入无法稳定工作，就停止投入，把资源转向 host-native HAL mock 与实板自动化。
 
@@ -31,7 +31,7 @@ Velxio 是一个开源多开发板仿真平台，项目以 AGPL-3.0 发布。它
 
 审阅了仓库 README、架构、ESP32/C6 仿真、CI、自定义芯片 API、部件目录和编译后端。当前公开源码中的 RISC-V 板型表主要覆盖 C3；C6 板型通过在线能力注册，意味着“仓库可自建”不能推导出“C6 可完全离线自建”。
 
-编译后端会生成/改写 ESP-IDF 工程结构、sdkconfig 和分区，适合平台模板，但不能等同于原样构建复杂的 xiaozhi 多组件工程。HiYaKa 应以 Raynode 的真实构建产物为准。
+编译后端会生成/改写 ESP-IDF 工程结构、sdkconfig 和分区，适合平台模板，但不能等同于原样构建复杂的 xiaozhi 多组件工程。HiYaKa 应以 `aliyun_raynode` 的真实构建产物为准。
 
 ### 3.2 在线烟雾测试
 
@@ -61,7 +61,7 @@ Velxio 是一个开源多开发板仿真平台，项目以 AGPL-3.0 发布。它
 
 Velxio 官方资料当前以 ESP-IDF 5.5.4 为主要编译基线，HiYaKa 使用 6.1。若用 Velxio 自带编译器编译 HiYaKa，会同时改变 SDK、项目生成逻辑和部分配置，失败时无法判断是 HiYaKa 缺陷还是仿真平台差异。
 
-**处理原则：**只接受 Raynode IDF 6.1 构建的 merged image 作为候选；平台编译器只用于最小模型和示例，不作为发布构建。
+**处理原则：**只接受 `aliyun_raynode` IDF 6.1 构建的 merged image 作为候选；平台编译器只用于最小模型和示例，不作为发布构建。
 
 ### 5.2 C6 依赖在线服务
 
@@ -79,7 +79,7 @@ PCA9557、QMI8658A 可通过自定义 I²C 寄存器模型补足；ST7789 可能
 
 ```text
                   ┌─ host tests / HAL mock：领域状态机、队列、文件恢复、协议
-HiYaKa 同一源码 ───┼─ Raynode ESP-IDF 6.1：发布构建真值与 merged image
+HiYaKa 同一源码 ───┼─ aliyun_raynode ESP-IDF 6.1：发布构建真值与 merged image
                   ├─ Velxio L0.5：C6 启动、虚拟 IO、UI、I²C 行为、故障注入
                   └─ 实板 L1–L3：电气、音频、射频、电源、交互、长稳
 ```
@@ -90,7 +90,7 @@ Velxio 和 host mock 是互补关系：前者提供可视化连线和开发板�
 
 目标只验证“是否值得接入”，不先建设完整虚拟样机。
 
-1. 在 Raynode 用当前固定容器/ESP-IDF 6.1 构建 HiYaKa 16 MiB merged flash image；
+1. 在 `aliyun_raynode` 用当前固定容器/ESP-IDF 6.1 构建 HiYaKa 16 MiB merged flash image；
 2. 在独立 `feature/velxio-spike` 分支创建 `simulation/velxio/velxio.toml`、`diagram.json` 和最小自定义 PCA9557 模型；
 3. 启动同一镜像，验证 ROM/应用启动、UART 诊断和复位路径；
 4. 验证五个 I²C 地址的存在/缺失矩阵，重点观察 PCA9557 先 Output 后 Configuration 及 readback；

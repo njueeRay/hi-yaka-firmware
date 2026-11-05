@@ -3,6 +3,8 @@
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <driver/i2s_tdm.h>
+#include <algorithm>
+#include <array>
 
 #define TAG "BoxAudioCodec"
 
@@ -11,7 +13,8 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
                              gpio_num_t din, gpio_num_t pa_pin, uint8_t es8311_addr,
                              uint8_t es7210_addr, bool input_reference, float input_gain,
                              int reference_gain_channel, float reference_gain,
-                             i2c_port_t i2c_port, uint32_t es7210_mic_mask) {
+                             i2c_port_t i2c_port, uint32_t es7210_mic_mask,
+                             bool speaker_pa_enabled, bool std_stereo_input) {
     duplex_ = true;                              // 是否双工
     input_reference_ = input_reference;          // 是否使用参考输入，实现回声消除
     input_channels_ = input_reference_ ? 2 : 1;  // 输入通道数
@@ -20,6 +23,8 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     input_gain_ = input_gain;
     reference_gain_channel_ = reference_gain_channel;
     reference_gain_ = reference_gain;
+    speaker_pa_enabled_ = speaker_pa_enabled;
+    std_stereo_input_ = std_stereo_input;
 
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
 
@@ -48,7 +53,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es8311_cfg.ctrl_if = out_ctrl_if_;
     es8311_cfg.gpio_if = gpio_if_;
     es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC;
-    es8311_cfg.pa_pin = pa_pin;
+    es8311_cfg.pa_pin = speaker_pa_enabled_ ? pa_pin : GPIO_NUM_NC;
     es8311_cfg.use_mclk = true;
     es8311_cfg.hw_gain.pa_voltage = 5.0;
     es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
@@ -79,7 +84,8 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     input_dev_ = esp_codec_dev_new(&dev_cfg);
     assert(input_dev_ != NULL);
 
-    ESP_LOGI(TAG, "BoxAudioDevice initialized");
+    ESP_LOGI(TAG, "BoxAudioDevice initialized (speaker_pa=%s)",
+             speaker_pa_enabled_ ? "enabled" : "disabled");
 }
 
 BoxAudioCodec::~BoxAudioCodec() {
@@ -180,7 +186,14 @@ void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
     };
 
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_handle_, &std_cfg));
-    ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+    if (std_stereo_input_) {
+        i2s_std_config_t rx_std_cfg = std_cfg;
+        rx_std_cfg.gpio_cfg.dout = I2S_GPIO_UNUSED;
+        rx_std_cfg.gpio_cfg.din = din;
+        ESP_ERROR_CHECK(i2s_channel_init_std_mode(rx_handle_, &rx_std_cfg));
+    } else {
+        ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+    }
     ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
     ESP_ERROR_CHECK(i2s_channel_enable(rx_handle_));
     ESP_LOGI(TAG, "Duplex channels created");
@@ -199,7 +212,7 @@ void BoxAudioCodec::EnableInput(bool enable) {
     if (enable) {
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
-            .channel = 4,
+            .channel = static_cast<uint8_t>(std_stereo_input_ ? 2 : 4),
             .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
             .sample_rate = (uint32_t)output_sample_rate_,
             .mclk_multiple = 0,
@@ -246,15 +259,71 @@ void BoxAudioCodec::EnableOutput(bool enable) {
 }
 
 int BoxAudioCodec::Read(int16_t* dest, int samples) {
-    if (input_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(input_dev_, (void*)dest, samples * sizeof(int16_t)));
+    if (!input_enabled_ || dest == nullptr || samples <= 0) {
+        return 0;
+    }
+    const int result = esp_codec_dev_read(input_dev_, dest, samples * sizeof(int16_t));
+    if (result != ESP_CODEC_DEV_OK) {
+        ESP_LOGE(TAG, "input read failed: codec result=%d samples=%d", result, samples);
+        return 0;
     }
     return samples;
 }
 
+void BoxAudioCodec::LogInputDiagnostics() {
+    if (!input_enabled_) {
+        ESP_LOGW(TAG, "input diagnostic skipped: input disabled");
+        return;
+    }
+    constexpr std::array<int, 23> kRegisters = {
+        0x00, 0x01, 0x02, 0x06, 0x08, 0x0B, 0x11, 0x12,
+        0x14, 0x15, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
+        0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C,
+    };
+    for (const int reg : kRegisters) {
+        int value = 0;
+        const int result = esp_codec_dev_read_reg(input_dev_, reg, &value);
+        ESP_LOGI(TAG, "ES7210 register 0x%02X: result=%d value=0x%02X", reg,
+                 result, value & 0xFF);
+        if (reg == 0x0B && result == 0) {
+            ESP_LOGI(TAG, "ES7210 chip state: %d (0=power-down, 1=initial, 2=normal, 3=power-up)",
+                     value & 0x03);
+        }
+    }
+
+    std::array<int16_t, 512> raw{};
+    size_t bytes_read = 0;
+    const esp_err_t result = i2s_channel_read(rx_handle_, raw.data(),
+                                               raw.size() * sizeof(raw[0]),
+                                               &bytes_read, pdMS_TO_TICKS(250));
+    int peak_even = 0;
+    int peak_odd = 0;
+    size_t nonzero = 0;
+    for (size_t index = 0; index < bytes_read / sizeof(raw[0]); ++index) {
+        const int value = raw[index] < 0 ? -static_cast<int>(raw[index])
+                                         : static_cast<int>(raw[index]);
+        (index & 1U ? peak_odd : peak_even) =
+            std::max(index & 1U ? peak_odd : peak_even, value);
+        nonzero += raw[index] != 0;
+    }
+    ESP_LOGI(TAG,
+             "raw I2S RX: result=%s bytes=%u nonzero=%u even_peak=%d odd_peak=%d first=%d,%d,%d,%d",
+             esp_err_to_name(result), static_cast<unsigned>(bytes_read),
+             static_cast<unsigned>(nonzero), peak_even, peak_odd,
+             raw[0], raw[1], raw[2], raw[3]);
+}
+
 int BoxAudioCodec::Write(const int16_t* data, int samples) {
     if (output_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t)));
+        const esp_err_t result =
+            esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(result);
+        if (result == ESP_OK && !digital_output_observed_ && samples > 0) {
+            ESP_LOGI(TAG,
+                     "digital audio write verified: samples=%d speaker_pa=%s",
+                     samples, speaker_pa_enabled_ ? "enabled" : "disabled");
+            digital_output_observed_ = true;
+        }
     }
     return samples;
 }

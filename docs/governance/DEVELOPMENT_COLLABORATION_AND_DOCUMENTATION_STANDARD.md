@@ -38,7 +38,7 @@ public   -> ChatChatTech/yaka（仅用于受控快照发布，不做日常同步
 
 1. 从最新 `main` 建短生命周期分支；
 2. 把硬件/产品契约写成测试和配置，再实现代码；
-3. 本地或 Raynode 完成格式、聚焦测试、ESP-IDF 6.1 构建和产物哈希；
+3. Windows 本地机只做 USB/串口、烧录、实板调试和日志采集；格式检查、host tests、合同检查、ESP-IDF 6.1 构建和产物哈希统一在 `aliyun_raynode` 或 GitHub Actions 的 Linux 环境完成；
 4. 通过 PR 合入私有 `main`；PR 必须声明范围、风险、验证等级和未验证项；
 5. 需要发布时，从私有仓库的已验证 SHA 生成干净快照，经过边界扫描后提交到 `ChatChatTech/yaka/firmware`；
 6. 在 `firmware/PUBLIC_RELEASE.md` 登记私有来源 SHA、上游基线、SDK、验证等级和公开提交 SHA。
@@ -51,7 +51,7 @@ public   -> ChatChatTech/yaka（仅用于受控快照发布，不做日常同步
 2. `fetch upstream`，阅读目标区间 release notes、构建系统、分区、音频、协议和板型变化；
 3. 在独立集成分支合并或变基；长期产品分支优先采用 merge 保留来源关系，不重写已共享历史；
 4. 冲突按三类处理：平台通用能力吸收上游；HiYaKa 板级事实保留本地；产品行为不得由上游默认值覆盖；
-5. 运行 host tests、IDF 6.1 全构建、资源变化比较；有样机后追加 L1/L2 回归；
+5. 在 `aliyun_raynode` 或 GitHub Actions 运行 host tests、IDF 6.1 全构建和资源变化比较；Windows 只追加烧录、串口与 L1/L2 实板回归；
 6. PR 单独合入，不把上游升级和产品新功能混成一个不可审阅变更；
 7. 更新 `UPSTREAM.md` 和版本/决策日志。
 
@@ -134,7 +134,7 @@ public   -> ChatChatTech/yaka（仅用于受控快照发布，不做日常同步
 - 从已合入、已标记的私有 SHA 生成快照，不复制 `.git`；
 - 排除 Agent/Skill、飞书 token/revision、服务器凭据、内部 PRD、未批准审计、采购与个人信息；
 - 运行敏感信息和内部路径扫描；
-- 在公开树重新运行适用测试和构建；
+- 在公开树的 GitHub Actions/Linux 环境重新运行适用测试和构建；Windows 不承担发布构建；
 - 更新 `PUBLIC_RELEASE.md`，注明快照性质、来源基线、验证等级和已知限制；
 - 通过公开仓库 PR 或受保护分支规则合入；紧急直推也必须留下等价审计记录。
 
