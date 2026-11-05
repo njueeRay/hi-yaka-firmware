@@ -14,7 +14,7 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertEqual(config["manufacturer"], "chatchat")
         self.assertEqual(config["type"], "hi-yaka")
         self.assertEqual(config["target"], "esp32c6")
-        self.assertEqual(len(config["builds"]), 3)
+        self.assertEqual(len(config["builds"]), 4)
         build = config["builds"][0]
         self.assertEqual(build["name"], "hi-yaka")
         options = set(build["sdkconfig_append"])
@@ -42,6 +42,14 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", headless_options)
         self.assertIn("CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y", headless_options)
         self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", headless_options)
+
+        audio_ab_build = config["builds"][3]
+        self.assertEqual(audio_ab_build["name"], "hi-yaka-lab-audio-ab")
+        audio_ab_options = set(audio_ab_build["sdkconfig_append"])
+        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", audio_ab_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", audio_ab_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", audio_ab_options)
+        self.assertIn("CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS=y", audio_ab_options)
 
     def test_build_selection_chain_is_complete(self):
         kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
