@@ -225,6 +225,8 @@ Stage 2 退出条件不是“单次演示成功”，而是每个模块拥有 L2
 - [证据与事实治理](../governance/EVIDENCE_POLICY.md)
 - [麦克风全零固件 A/B 判别实验](../bringup/2026-11-05-audio-ab-plan.md)
 - [麦克风无数据 A/B 实板结果与剩余硬件分支](../bringup/2026-11-05-audio-ab-results.md)
+- [HIYAKA-LCD-INC-001 显示屏完全无背光](../bringup/HIYAKA_LCD_BACKLIGHT_INCIDENT.md)
+- [HIYAKA-NFC-INC-001 PN532 无 I²C 应答](../bringup/HIYAKA_NFC_NO_ACK_INCIDENT.md)
 - [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](../bringup/HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)
 - [01 测试、问题与发布记录](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf)
 

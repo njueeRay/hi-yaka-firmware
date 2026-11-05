@@ -17,6 +17,8 @@
 - [证据等级与里程碑矩阵](EVIDENCE_LEVEL_MATRIX.md)：L0–L3 与 M1–M7 的关闭条件；
 - [实板前适配状态与首板启用顺序](PREBOARD_ADAPTER_STATUS.md)：安全构建、实验构建、M2–M5 L0 适配与逐项启用顺序；
 - [2026-11-04 LCD、PN532 与麦克风专项诊断](2026-11-04-lcd-nfc-mic-investigation.md)：首板实测、当前根因分层和下一步测量；
+- [HIYAKA-LCD-INC-001 显示屏完全无背光](HIYAKA_LCD_BACKLIGHT_INCIDENT.md)：已定位的背光控制缺陷、返修路径与画面验收；
+- [HIYAKA-NFC-INC-001 PN532 无 I²C 应答](HIYAKA_NFC_NO_ACK_INCIDENT.md)：根因待定的分层测量与关闭条件；
 - [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)：现象、逐层排查、解决路径与关闭条件；
 - `scripts/hi_yaka_evidence.py`：生成、记录和校验样机证据包。
 
