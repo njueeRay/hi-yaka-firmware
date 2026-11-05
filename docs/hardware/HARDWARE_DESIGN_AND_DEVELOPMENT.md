@@ -225,6 +225,7 @@ Stage 2 退出条件不是“单次演示成功”，而是每个模块拥有 L2
 - [证据与事实治理](../governance/EVIDENCE_POLICY.md)
 - [麦克风全零固件 A/B 判别实验](../bringup/2026-11-05-audio-ab-plan.md)
 - [麦克风无数据 A/B 实板结果与剩余硬件分支](../bringup/2026-11-05-audio-ab-results.md)
+- [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](../bringup/HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)
 - [01 测试、问题与发布记录](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf)
 
 所有测试记录至少包含时间、操作者、Git SHA、SDK/容器、硬件 revision、样机 SN、步骤、原始日志、产物哈希、期望、实测、结论和复测条件。原始日志只追加，不用总结覆盖原始证据。

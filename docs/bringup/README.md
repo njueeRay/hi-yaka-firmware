@@ -17,6 +17,7 @@
 - [证据等级与里程碑矩阵](EVIDENCE_LEVEL_MATRIX.md)：L0–L3 与 M1–M7 的关闭条件；
 - [实板前适配状态与首板启用顺序](PREBOARD_ADAPTER_STATUS.md)：安全构建、实验构建、M2–M5 L0 适配与逐项启用顺序；
 - [2026-11-04 LCD、PN532 与麦克风专项诊断](2026-11-04-lcd-nfc-mic-investigation.md)：首板实测、当前根因分层和下一步测量；
+- [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)：现象、逐层排查、解决路径与关闭条件；
 - `scripts/hi_yaka_evidence.py`：生成、记录和校验样机证据包。
 
 ## 2. 不可跳过的身份绑定
