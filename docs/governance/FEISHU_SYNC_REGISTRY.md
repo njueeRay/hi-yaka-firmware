@@ -22,7 +22,7 @@
 | `.agents/skills/yaka-project/references/yaka-3.0-owner-decisions-and-todos.md` | [03 当前角色、Owner 决策与待办](https://scnlb1lk96sb.feishu.cn/docx/Y5SqdV9zloa3eLxQZALcTDQ4nOe) | `Y5SqdV9zloa3eLxQZALcTDQ4nOe` | 17 | 已覆盖旧静态放行与“等待样机”状态；同步 L7 隔离、PN532/QMI8658A、WAV、M1 恢复边界及下一版 ECO 待办 |
 | 外部资料治理与 `docs/research/VELXIO_SIMULATION_EVALUATION.md` | [04 外部参考与技术调研](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 11 | 现行适用版本统一为 HiYaKa；位于 `03 协作、决策与调研` |
 | `docs/governance/EVIDENCE_POLICY.md`、`docs/governance/ISSUE_ANALYSIS_TEMPLATE.md` 与 `docs/bringup/` | [01 测试与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 57 | 换入样机复测修订版及 PWR_A 黄灯修复摘要已回读；模板、三项缺陷入口保留，动态状态由多维表格维护 |
-| 三项独立专项问题与动态状态 | [HiYaKa 反馈与处理台账](https://scnlb1lk96sb.feishu.cn/base/PE5BbvVtOaHxI4soxwKc9w7Cn7b) | Base `PE5BbvVtOaHxI4soxwKc9w7Cn7b` / 表 `tblLefBEZhKEUhcC` | 47 | YAKA-0004 LCD=`reczz28VrGurKogr`、YAKA-0005 NFC=`reczz28VrGurLWAH`、YAKA-0006 麦克风=`reczz28VrGurNE5G`；换入样机增量与日期版附件逐条回读，仍为“处理中” |
+| 三项独立专项问题与动态状态 | [HiYaKa 反馈与处理台账](https://scnlb1lk96sb.feishu.cn/base/PE5BbvVtOaHxI4soxwKc9w7Cn7b) | Base `PE5BbvVtOaHxI4soxwKc9w7Cn7b` / 表 `tblLefBEZhKEUhcC` | 49 | YAKA-0004 LCD=`reczz28VrGurKogr`、YAKA-0005 NFC=`reczz28VrGurLWAH`、YAKA-0006 麦克风=`reczz28VrGurNE5G`；NFC 原板独立接口 A/B 进展及两份附件已回读，仍为“处理中” |
 | 历史仓库与旧资料归档规则 | [00 历史资料索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 10 | 位于 `99 历史资料（只读）` |
 | 已废止的旧接口摘要 | [90 [已废止] 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 24 | 仅供历史追溯，不得作为当前接口输入 |
 
@@ -75,6 +75,8 @@
 同日将 LCD、NFC、麦克风拆为三份六节专项问题：LCD 背光控制缺陷已定位但未返修，NFC NACK 和麦克风无数据的根因尚未证实。`ISSUE_ANALYSIS_TEMPLATE.md` 首次作为附件加入“01 测试与发布”并在“记录方式”建立入口；该页首页从旧的“全部未实板验证”更新为当前受控样机状态，回读 revision 51。三项分别创建台账 YAKA-0004/0005/0006，上传各自 Markdown 到记录附件并逐条回读至 Base rev 43；硬件主文档将旧麦克风长版标记为历史并链接当前台账，回读 revision 141。原始反馈字段不覆盖，之后在处理意见、附件与状态维护增量。
 
 2026-11-05 换入样机从空 Flash 完整烧录后，再次复现 LCD 无背光、PN532 NACK 和麦克风无有效数据；TF 插卡复位后挂载成功，ACT_B 红灯录音与 PWR_A 短振复验。单次复测事实写入 `2026-11-05-replacement-board-retest.md` 并附至“01 测试与发布”，该页 section 5 增加摘要并回读 revision 54；三条原缺陷记录各追加进展和日期版 Markdown 附件，Base rev 47 回读仍为“处理中”。
+
+同日原开发样机完成独立 PN532 I²C/HSU A/B：`0x24` 三轮 NACK，切至 HSU 后三轮无返回；实验镜像已撤回并恢复原固件。`YAKA-0005` 增量记录和两份 Markdown 附件已回读至 Base rev 49，附件 token 分别为 `WMD4bYIcZoDSIPxY7qAc1FD9n0b`（日期版专项问题）与 `Lw61bWU3YoxVeMxBoxFcgewjnWd`（接口 A/B 记录）。状态维持“处理中”，NFC 未验收。
 
 同日修复实验室构建的 PWR_A 黄灯反馈：提交 `68e8765` 在录音灯优先模式下短暂显示黄灯约 250 ms，随后恢复红灯或熄灯。换入样机上，操作者确认录音中和录音停止后的短振、黄灯及灯态恢复；串口抓到对应 PWR_A 事件。三项 GitHub Actions 均成功。修订后的复测 Markdown 作为新附件追加，测试发布页摘要和附件已回读至 revision 57；LCD、NFC、麦克风缺陷仍为“处理中”，未因该交互修复而关闭。
 
