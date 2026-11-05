@@ -501,6 +501,40 @@ private:
 #endif
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
+#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS || CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS
+        audio_codec_->EnableInput(true);
+        vTaskDelay(pdMS_TO_TICKS(150));
+        audio_codec_->LogInputDiagnostics();
+        std::vector<int16_t> baseline(512, 0);
+        const bool baseline_read = audio_codec_->InputData(baseline);
+        std::size_t baseline_nonzero = 0;
+        int baseline_peak = 0;
+        for (int16_t sample : baseline) {
+            baseline_nonzero += sample != 0;
+            baseline_peak = std::max(baseline_peak, sample < 0 ? -static_cast<int>(sample)
+                                                       : static_cast<int>(sample));
+        }
+        ESP_LOGI(TAG, "audio C paired baseline: read=%d nonzero=%u peak=%d first=%d,%d,%d,%d",
+                 baseline_read, static_cast<unsigned>(baseline_nonzero), baseline_peak,
+                 baseline[0], baseline[1], baseline[2], baseline[3]);
+        vTaskDelay(pdMS_TO_TICKS(25000));
+        audio_codec_->LogInputDiagnostics();
+        LogI2sPadEdges("MCLK", YAKA_AUDIO_MCLK_GPIO, 1000);
+        LogI2sPadEdges("BCLK", YAKA_AUDIO_BCLK_GPIO, 10000);
+        LogI2sPadEdges("WS", YAKA_AUDIO_WS_GPIO, 20000);
+        LogI2sPadEdges("SDOUT1", YAKA_AUDIO_DIN_GPIO, 20000);
+        ESP_LOGI(TAG, "C GPIO13 weak pulldown set=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_PULLDOWN_ONLY)));
+        vTaskDelay(pdMS_TO_TICKS(100));
+        audio_codec_->LogInputDiagnostics();
+        ESP_LOGI(TAG, "C GPIO13 weak pullup set=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_PULLUP_ONLY)));
+        vTaskDelay(pdMS_TO_TICKS(100));
+        audio_codec_->LogInputDiagnostics();
+        ESP_LOGI(TAG, "C GPIO13 restore floating=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_FLOATING)));
+        audio_codec_->EnableInput(false);
+#endif
     }
 #endif
 

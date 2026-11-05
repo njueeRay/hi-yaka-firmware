@@ -173,23 +173,57 @@ void RunRxOnly(i2c_master_bus_handle_t i2c_bus) {
 
     esp_err_t read_result = ESP_ERR_INVALID_STATE;
     std::size_t bytes_read = 0;
-    std::size_t nonzero = 0;
-    int peak = 0;
     if (open_result == ESP_CODEC_DEV_OK) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-        std::array<int16_t, kSamplesPerBlock> samples{};
-        read_result =
-            i2s_channel_read(rx, samples.data(), sizeof(samples), &bytes_read, pdMS_TO_TICKS(300));
-        if (read_result == ESP_OK) {
-            for (std::size_t i = 0; i < bytes_read / sizeof(int16_t); ++i) {
-                nonzero += samples[i] != 0;
-                peak = std::max(peak, std::abs(static_cast<int>(samples[i])));
+        for (int pass = 0; pass < 5; ++pass) {
+            int gain0 = ESP_CODEC_DEV_OK;
+            int gain1 = ESP_CODEC_DEV_OK;
+            if (pass == 1) {
+                gain0 = esp_codec_dev_set_in_channel_gain(dev, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
+                                                          24.0f);
+                gain1 = esp_codec_dev_set_in_channel_gain(dev, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1),
+                                                          24.0f);
             }
+            if (pass == 3) {
+                ESP_LOGI(
+                    kTag, "B GPIO13 weak pulldown set=%s",
+                    esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_PULLDOWN_ONLY)));
+            } else if (pass == 4) {
+                ESP_LOGI(
+                    kTag, "B GPIO13 weak pullup set=%s",
+                    esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_PULLUP_ONLY)));
+            }
+            vTaskDelay(pdMS_TO_TICKS(pass == 2 ? 10000 : 150));
+            std::array<int16_t, kSamplesPerBlock> samples{};
+            bytes_read = 0;
+            read_result = i2s_channel_read(rx, samples.data(), sizeof(samples), &bytes_read,
+                                           pdMS_TO_TICKS(300));
+            std::size_t nonzero = 0;
+            std::size_t plus_one = 0;
+            std::size_t minus_one = 0;
+            int peak = 0;
+            if (read_result == ESP_OK) {
+                for (std::size_t i = 0; i < bytes_read / sizeof(int16_t); ++i) {
+                    nonzero += samples[i] != 0;
+                    plus_one += samples[i] == 1;
+                    minus_one += samples[i] == -1;
+                    peak = std::max(peak, std::abs(static_cast<int>(samples[i])));
+                }
+            }
+            int chip_state = -1;
+            const int state_result = esp_codec_dev_read_reg(dev, 0x0B, &chip_state);
+            ESP_LOGI(kTag,
+                     "B ES7210 RX-only phase=%d set=%d,%d state=%d:0x%02X gpio13=%d read=%s "
+                     "bytes=%u nonzero=%u +1=%u -1=%u peak=%d first=%d,%d,%d,%d",
+                     pass, gain0, gain1, state_result, chip_state & 0xFF,
+                     gpio_get_level(YAKA_AUDIO_DIN_GPIO), esp_err_to_name(read_result),
+                     static_cast<unsigned>(bytes_read), static_cast<unsigned>(nonzero),
+                     static_cast<unsigned>(plus_one), static_cast<unsigned>(minus_one), peak,
+                     samples[0], samples[1], samples[2], samples[3]);
         }
+        ESP_LOGI(kTag, "B GPIO13 restore floating=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_FLOATING)));
     }
-    ESP_LOGI(kTag, "B ES7210 RX-only: open=%d read=%s bytes=%u nonzero=%u peak=%d", open_result,
-             esp_err_to_name(read_result), static_cast<unsigned>(bytes_read),
-             static_cast<unsigned>(nonzero), peak);
+    ESP_LOGI(kTag, "B ES7210 RX-only open=%d", open_result);
 
     if (dev != nullptr) {
         if (open_result == ESP_CODEC_DEV_OK)

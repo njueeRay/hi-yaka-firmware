@@ -13,8 +13,8 @@
 | `docs/governance/PROJECT_CHARTER.md` 与项目索引 | [00 HiYaKa 项目总览与文档导航](https://scnlb1lk96sb.feishu.cn/docx/Kl74deqLtoteWyxeshlci43qn0g) | `Kl74deqLtoteWyxeshlci43qn0g` | 44 | 顶层唯一入口；当前阶段、U11/BOOST `NO-GO`、L7 隔离边界、M2–M6 L0 与受控恢复顺序已回读 |
 | `.agents/skills/yaka-project/references/yaka-3.0-prd.md` | [01 产品需求与交互状态](https://scnlb1lk96sb.feishu.cn/docx/T3isd0m8jo2bVEx37noc9Oq3noh) | `T3isd0m8jo2bVEx37noc9Oq3noh` | 53 | 完整产品 PRD v0.4；现行产品/系列语义统一为 HiYaKa；OTA 已对齐 MVP Must 与验收矩阵；位于 `01 产品与使用` |
 | `docs/product/PRODUCT_DATA_AND_USER_MANUAL.md` | [02 产品规格与使用手册](https://scnlb1lk96sb.feishu.cn/docx/XohYdP65uo5zfTxkMEScyzXinag) | `XohYdP65uo5zfTxkMEScyzXinag` | 5 | 现行产品语义统一为 HiYaKa；位于 `01 产品与使用` |
-| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 194 | M6 将 IMU 基础读取与轴向/稳定性验收拆开；LCD/NFC/麦克风实板缺口、无屏幕对照和芯片状态已回读；架构 v1.6 附件保留 |
-| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 130 | 麦克风 A/B 实验方案附件已加入 3.6 索引，同周 checklist 已增量更新；实验固件只取得 L0 构建证据，旧附件保留追溯 |
+| `docs/governance/FIRMWARE_PRD.md` | [01 固件 PRD 与里程碑](https://scnlb1lk96sb.feishu.cn/docx/DwmvdwnfboJKX3xpbyIc1b0bntc) | `DwmvdwnfboJKX3xpbyIc1b0bntc` | 195 | 麦克风 A/B 实板结果、固定码值、ES7210 状态冲突和未通过结论已回读；架构 v1.6 附件保留 |
+| `docs/hardware/HARDWARE_DESIGN_AND_DEVELOPMENT.md` | [02 硬件设计与研发主文档](https://scnlb1lk96sb.feishu.cn/docx/I2SIdpqZnouTxkxYEuLcnyJxndc) | `I2SIdpqZnouTxkxYEuLcnyJxndc` | 136 | 麦克风 A/B 实板结果附件已加入 3.6 索引，同周日志和 checklist 已定点更新并回读；旧附件保留追溯 |
 | `docs/hardware/HARDWARE_MODULE_INTERFACES.md` | [03 硬件连接与固件接口表](https://scnlb1lk96sb.feishu.cn/docx/UdVhdzlP6oAxXZxzyMIc25SxnMk) | `UdVhdzlP6oAxXZxzyMIc25SxnMk` | 46 | ACT_B/PWR_B 实板映射、IMU 基础数据、GPIO13 无翻转、无屏幕 NFC 对照及 R63/R64/R65 阻值已回读；PA 继续硬禁用 |
 | `docs/hardware/HIYAKA_U11_THERMAL_INCIDENT_AND_RECOVERY.md` | [04 U11 异常发热失效复盘与现板恢复方案](https://scnlb1lk96sb.feishu.cn/docx/XoLCdhpQqoQjjDxHEhyciFfxnJe) | `XoLCdhpQqoQjjDxHEhyciFfxnJe` | 8 | `HIYAKA-HW-INC-001` 根因保留；新增 L7 拆除后的现场观察、开发隔离条件与发布决定 |
 | `docs/governance/DEVELOPMENT_COLLABORATION_AND_DOCUMENTATION_STANDARD.md` | [01 开发协作与文档维护规范](https://scnlb1lk96sb.feishu.cn/docx/K33VdjETzooOrTxIQD9cOYXln5c) | `K33VdjETzooOrTxIQD9cOYXln5c` | 15 | 已回读执行环境边界：Windows 只做烧录/串口/实板调试，构建与测试统一在 `aliyun_raynode` 或 GitHub Actions/Linux |
@@ -67,6 +67,8 @@
 
 同日增加麦克风软件 A/B：独立 `hi-yaka-lab-audio-ab` 实验变体在 `aliyun_raynode` 的 ESP-IDF 6.1 容器完整构建，Linux 137 项 host tests 通过；实验依次检查 GPIO1 内部 I²S 回环、ES7210 单独 RX，最后恢复原双工基线。当前 MASTER OFF，未烧录、未取得新采样，不改变麦克风 FAIL。实验方案 Markdown 已追加到硬件主文档文末，3.6 索引和同周 checklist 更新并回读至 revision 130。
 
+同日完成麦克风 A/B 实板回读：内部回环证明 MCU I²S 接收/DMA 可读已知数据；ES7210 单 RX 与独立原双工在 GPIO13 只见固定全 0/全 -1，弱上下拉决定码值，25 秒后仍无有效音频。0x0B 状态在不同实验中读到 0 与 2，不能判定 U12 本体损坏。结果附件追加至硬件主文档末尾并在 3.6 索引；同周日志、checklist 及固件 PRD 均局部同步并回读至主文档 revision 136、固件 PRD revision 195。实验后已恢复原无屏幕实验镜像，麦克风、LCD、NFC 仍未通过。
+
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）；当前公开固件快照：`ChatChatTech/yaka@0489e83`（2026-11-02）。
 
 ## 2. 附件登记
@@ -74,6 +76,7 @@
 | 附件 | 目标文档 | SHA-256 | 飞书文件 Token | 状态 |
 |---|---|---|---|---|
 | `docs/bringup/2026-11-05-audio-ab-plan.md`（麦克风软件 A/B 实验） | 02 硬件主文档 | `856ab25e1028ce515374ed03fb4f140debc77c7d24c502ed4fa02062e7debb21` | `CTokbQLRcouK9GxYkPlcLn1fnAb` | 2026-11-05 已上传并在 3.6 索引，附件块 `doxcnREJrpycsIPYMnO6T3HYod3` |
+| `docs/bringup/2026-11-05-audio-ab-results.md`（麦克风 A/B 实板结果） | 02 硬件主文档 | `afeabbacef9926b56f6e39901910c5eb0edcc1aed538cdee3a5acac0` | `GyHQbwIqmoARfixoR5HcaOfDn37` | 2026-11-05 已上传并在 3.6 索引，附件块 `doxcnlSk75lySnYkCag0D1h16gf`；原始日志仅本地保留 |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（旧板 S3 工程/固件交叉对照现行版） | 02 硬件主文档 | `a6aa0b599e402534a94ae9664b50cf3302e903cbaf1d3446664a3e7c4ccc5ee4` | `MRgOb1H04ombgyxNk5DcscLcnmd` | 2026-11-05 已上传并在 3.1 索引，附件块 `doxcnaM1YVkVe57RtsK2UlVKiuh` |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（R63/R64/R65 实测历史版） | 02 硬件主文档 | `63d899e3fd8540a65a33a156891171177696b6406c86b77bba928f8b2fe408e7` | `BFtYbHkufoa34gxmOFZcRGvTnyg` | 2026-11-05 已上传，旧附件保留追溯 |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（引脚活动、芯片状态、无屏幕对照，R65 实测前） | 02 硬件主文档 | `e012635d49485d7197aa7468e006ddb6d273d1b336ea2dd96684a30389bd0829` | `UmXBbuci6oIkcHxKQeocKEwinKf` | 当日中间版，保留追溯 |
