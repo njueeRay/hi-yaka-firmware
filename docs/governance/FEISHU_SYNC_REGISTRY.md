@@ -21,8 +21,8 @@
 | 仓库、上游与技术决策 | [02 决策与版本记录](https://scnlb1lk96sb.feishu.cn/docx/NWmcdvVpgov54exQOkIcvvOunmd) | `NWmcdvVpgov54exQOkIcvvOunmd` | 14 | 保存正式 ADR 与版本影响 |
 | `.agents/skills/yaka-project/references/yaka-3.0-owner-decisions-and-todos.md` | [03 当前角色、Owner 决策与待办](https://scnlb1lk96sb.feishu.cn/docx/Y5SqdV9zloa3eLxQZALcTDQ4nOe) | `Y5SqdV9zloa3eLxQZALcTDQ4nOe` | 17 | 已覆盖旧静态放行与“等待样机”状态；同步 L7 隔离、PN532/QMI8658A、WAV、M1 恢复边界及下一版 ECO 待办 |
 | 外部资料治理与 `docs/research/VELXIO_SIMULATION_EVALUATION.md` | [04 外部参考与技术调研](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 11 | 现行适用版本统一为 HiYaKa；位于 `03 协作、决策与调研` |
-| `docs/governance/EVIDENCE_POLICY.md`、`docs/governance/ISSUE_ANALYSIS_TEMPLATE.md` 与 `docs/bringup/` | [01 测试与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 51 | 2026-11-05 模板已加入“记录方式”并附 Markdown；首页当前结论和 YAKA-0004/5/6 入口已回读，动态状态由多维表格维护 |
-| 三项独立专项问题与动态状态 | [HiYaKa 反馈与处理台账](https://scnlb1lk96sb.feishu.cn/base/PE5BbvVtOaHxI4soxwKc9w7Cn7b) | Base `PE5BbvVtOaHxI4soxwKc9w7Cn7b` / 表 `tblLefBEZhKEUhcC` | 43 | YAKA-0004 LCD=`reczz28VrGurKogr`、YAKA-0005 NFC=`reczz28VrGurLWAH`、YAKA-0006 麦克风=`reczz28VrGurNE5G`；逐条回读为“处理中”且各有独立分析附件 |
+| `docs/governance/EVIDENCE_POLICY.md`、`docs/governance/ISSUE_ANALYSIS_TEMPLATE.md` 与 `docs/bringup/` | [01 测试与发布](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 54 | 2026-11-05 换入样机复测文字与附件已回读；模板、三项缺陷入口保留，动态状态由多维表格维护 |
+| 三项独立专项问题与动态状态 | [HiYaKa 反馈与处理台账](https://scnlb1lk96sb.feishu.cn/base/PE5BbvVtOaHxI4soxwKc9w7Cn7b) | Base `PE5BbvVtOaHxI4soxwKc9w7Cn7b` / 表 `tblLefBEZhKEUhcC` | 47 | YAKA-0004 LCD=`reczz28VrGurKogr`、YAKA-0005 NFC=`reczz28VrGurLWAH`、YAKA-0006 麦克风=`reczz28VrGurNE5G`；换入样机增量与日期版附件逐条回读，仍为“处理中” |
 | 历史仓库与旧资料归档规则 | [00 历史资料索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 10 | 位于 `99 历史资料（只读）` |
 | 已废止的旧接口摘要 | [90 [已废止] 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 24 | 仅供历史追溯，不得作为当前接口输入 |
 
@@ -74,6 +74,8 @@
 
 同日将 LCD、NFC、麦克风拆为三份六节专项问题：LCD 背光控制缺陷已定位但未返修，NFC NACK 和麦克风无数据的根因尚未证实。`ISSUE_ANALYSIS_TEMPLATE.md` 首次作为附件加入“01 测试与发布”并在“记录方式”建立入口；该页首页从旧的“全部未实板验证”更新为当前受控样机状态，回读 revision 51。三项分别创建台账 YAKA-0004/0005/0006，上传各自 Markdown 到记录附件并逐条回读至 Base rev 43；硬件主文档将旧麦克风长版标记为历史并链接当前台账，回读 revision 141。原始反馈字段不覆盖，之后在处理意见、附件与状态维护增量。
 
+2026-11-05 换入样机从空 Flash 完整烧录后，再次复现 LCD 无背光、PN532 NACK 和麦克风无有效数据；TF 插卡复位后挂载成功，ACT_B 红灯录音与 PWR_A 短振复验。单次复测事实写入 `2026-11-05-replacement-board-retest.md` 并附至“01 测试与发布”，该页 section 5 增加摘要并回读 revision 54；三条原缺陷记录各追加进展和日期版 Markdown 附件，Base rev 47 回读仍为“处理中”。
+
 双仓库发布策略及公开仓库日志对应本地提交：`b18d267`；公开仓库首次提交：`ChatChatTech/yaka@4ea1c48`（2026-10-29）；当前公开固件快照：`ChatChatTech/yaka@0489e83`（2026-11-02）。
 
 ## 2. 附件登记
@@ -84,9 +86,13 @@
 | `docs/bringup/2026-11-05-audio-ab-results.md`（麦克风 A/B 实板结果） | 02 硬件主文档 | `afeabbacef9926b56f6e39901910c5eb0edcc1aed538cdee3a5acac0` | `GyHQbwIqmoARfixoR5HcaOfDn37` | 2026-11-05 已上传并在 3.6 索引，附件块 `doxcnlSk75lySnYkCag0D1h16gf`；原始日志仅本地保留 |
 | `docs/bringup/HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md`（HIYAKA-AUDIO-INC-001） | 02 硬件主文档 | `80f1443e8143bd4be7095f6433df7e5faf646f4003e7be570dfb89a237aa3f49` | `T5pgb21Ppoeaf2xL5ncc0gh6nve` | 2026-11-05 已上传并在 3.6 索引，附件块 `doxcnPDOLwg6s1i8lcpC1IIFIvf`；未覆盖 A/B 原始结果附件 |
 | `docs/governance/ISSUE_ANALYSIS_TEMPLATE.md`（现行六节模板） | 01 测试与发布 | `4214e7c971541c622540f3c05d61121f6a3917f21cb51bc67bfc01a2e61df954` | `GkTjbjjTboa1xgx1VQCcW7xPnaf` | 文末附件块 `doxcnWKWhFTNbX78j19igkgyguf`，记录方式已建立入口 |
-| `docs/bringup/HIYAKA_LCD_BACKLIGHT_INCIDENT.md`（HIYAKA-LCD-INC-001） | Base YAKA-0004 附件 | `a0da0cbf1d724960b32b5e596cd1125fa12b81603ef32ea1681401eaaf948b09` | `K9OEblqhloZjeOxXLRhceqkKnCc` | `reczz28VrGurKogr`，当前版 |
-| `docs/bringup/HIYAKA_NFC_NO_ACK_INCIDENT.md`（HIYAKA-NFC-INC-001） | Base YAKA-0005 附件 | `975ec93c1a07f029e612b9eac808f09a2b8c507c001fde2edd885c8bfd7f75bc` | `JcVybQrKIofaeaxQXDtcgA0Hnee` | `reczz28VrGurLWAH`，当前版 |
-| `docs/bringup/HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md`（六节模板修订版） | Base YAKA-0006 附件 | `93d9d6f55671ff18527d6590ae4afe0a5435a38dd2dacf91fae77567d1666029` | `BBJIb9DZ9oWe1vxkIFAcBbhZndh` | `reczz28VrGurNE5G`，当前版；02 主文档旧长版保留历史 |
+| `docs/bringup/2026-11-05-replacement-board-retest.md`（换入样机复测） | 01 测试与发布 | `a5454a5e686d1670086892d638d6eb4b14de50a093f55091320eeaf8bf8946e2` | `GWXRb5ajvobnNOxprcSck8UUnbe` | 2026-11-05 已上传，附件块 `doxcnl4PqcLCYqXbBZqBKLjq4hc`，section 5 摘要已回读 |
+| `docs/bringup/HIYAKA_LCD_BACKLIGHT_INCIDENT.md`（HIYAKA-LCD-INC-001，日期版） | Base YAKA-0004 附件 | `f88410cea51288a768049bdc49de231909e7c8bb3eae0c7095e7c2aa8b4ce91f` | `XFmwbNS10oQGU4xmVuccLZGXnrf` | `reczz28VrGurKogr`，当前版；旧版附件保留追溯 |
+| `docs/bringup/HIYAKA_NFC_NO_ACK_INCIDENT.md`（HIYAKA-NFC-INC-001，日期版） | Base YAKA-0005 附件 | `68251838b1278340ed5bd743995466fd64ca86a1e906b51602affe00e53fea6c` | `B20IbDmbNoMX2PxCh5gcwmmKngb` | `reczz28VrGurLWAH`，当前版；旧版附件保留追溯 |
+| `docs/bringup/HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md`（HIYAKA-AUDIO-INC-001，日期版） | Base YAKA-0006 附件 | `fb3d6a8f10270e6f655b3ad34a8c219da53766afae4a649784a73d29037421b2` | `DLgVbEv2vo4GIbxmRLJcioGcnec` | `reczz28VrGurNE5G`，当前版；旧版附件保留追溯 |
+| `docs/bringup/HIYAKA_LCD_BACKLIGHT_INCIDENT.md`（HIYAKA-LCD-INC-001，历史版） | Base YAKA-0004 附件 | `a0da0cbf1d724960b32b5e596cd1125fa12b81603ef32ea1681401eaaf948b09` | `K9OEblqhloZjeOxXLRhceqkKnCc` | `reczz28VrGurKogr`，历史版 |
+| `docs/bringup/HIYAKA_NFC_NO_ACK_INCIDENT.md`（HIYAKA-NFC-INC-001，历史版） | Base YAKA-0005 附件 | `975ec93c1a07f029e612b9eac808f09a2b8c507c001fde2edd885c8bfd7f75bc` | `JcVybQrKIofaeaxQXDtcgA0Hnee` | `reczz28VrGurLWAH`，历史版 |
+| `docs/bringup/HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md`（六节模板历史版） | Base YAKA-0006 附件 | `93d9d6f55671ff18527d6590ae4afe0a5435a38dd2dacf91fae77567d1666029` | `BBJIb9DZ9oWe1vxkIFAcBbhZndh` | `reczz28VrGurNE5G`，历史版；02 主文档旧长版保留历史 |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（旧板 S3 工程/固件交叉对照现行版） | 02 硬件主文档 | `a6aa0b599e402534a94ae9664b50cf3302e903cbaf1d3446664a3e7c4ccc5ee4` | `MRgOb1H04ombgyxNk5DcscLcnmd` | 2026-11-05 已上传并在 3.1 索引，附件块 `doxcnaM1YVkVe57RtsK2UlVKiuh` |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（R63/R64/R65 实测历史版） | 02 硬件主文档 | `63d899e3fd8540a65a33a156891171177696b6406c86b77bba928f8b2fe408e7` | `BFtYbHkufoa34gxmOFZcRGvTnyg` | 2026-11-05 已上传，旧附件保留追溯 |
 | `docs/bringup/2026-11-04-lcd-nfc-mic-investigation.md`（引脚活动、芯片状态、无屏幕对照，R65 实测前） | 02 硬件主文档 | `e012635d49485d7197aa7468e006ddb6d273d1b336ea2dd96684a30389bd0829` | `UmXBbuci6oIkcHxKQeocKEwinKf` | 当日中间版，保留追溯 |
