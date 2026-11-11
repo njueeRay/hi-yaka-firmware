@@ -22,6 +22,7 @@
 - [HIYAKA-NFC-INC-001 PN532 无 I²C 应答](HIYAKA_NFC_NO_ACK_INCIDENT.md)：根因待定的分层测量与关闭条件；
 - [2026-11-05 NFC 主机接口 A/B 实板记录](2026-11-05-nfc-interface-ab-results.md)：旧版 HSU 与当前 I²C 对照、独立诊断镜像及原镜像恢复；
 - [2026-11-12 LCD 飞线后与全模块复测](2026-11-12-lcd-flywire-and-module-retest.md)：背光已亮、纯色画面未显示，以及同次外设证据；
+- [2026-11-12 PN532/C106 HSU 改线实板验证](2026-11-12-nfc-hsu-rework-validation.md)：纯 HSU 冷启动、实际读卡、I²C 绑带修正及与共享总线的边界；
 - [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)：现象、逐层排查、解决路径与关闭条件；
 - `scripts/hi_yaka_evidence.py`：生成、记录和校验样机证据包。
 
