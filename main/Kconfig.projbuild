@@ -1167,6 +1167,16 @@ menu "HiYaKa pre-board laboratory features"
             orientation, offsets, inversion and color order remain provisional
             until verified on a physical HiYaKa board.
 
+    config HI_YAKA_LCD_GPIO_DIAGNOSTIC
+        bool "Use slow GPIO serial output for LCD A/B diagnosis"
+        depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS
+        default n
+        help
+            Laboratory-only alternative to PARLIO. Send the same ST7789
+            commands and pixels using GPIO6 as data and GPIO7 as clock,
+            with data stable before each rising edge. This isolates the
+            PARLIO transport from the panel, FPC and PCA9557 controls.
+
     config HI_YAKA_ENABLE_INPUT
         bool "Enable provisional physical input adapter"
         default n

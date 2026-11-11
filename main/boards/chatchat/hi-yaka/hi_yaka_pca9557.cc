@@ -10,6 +10,7 @@
 namespace {
 
 constexpr char kTag[] = "HiYaKaPca9557";
+constexpr uint8_t kInputPortRegister = 0x00;
 constexpr uint8_t kOutputPortRegister = 0x01;
 constexpr uint8_t kConfigurationRegister = 0x03;
 constexpr int kRegisterWriteAttempts = 3;
@@ -157,4 +158,12 @@ esp_err_t HiYaKaPca9557::ReadBack(uint8_t* output, uint8_t* configuration) {
         result = ReadRegisterLocked(kConfigurationRegister, configuration);
     }
     return result;
+}
+
+esp_err_t HiYaKaPca9557::ReadPinLevels(uint8_t* levels) {
+    if (levels == nullptr) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    return ReadRegisterLocked(kInputPortRegister, levels);
 }

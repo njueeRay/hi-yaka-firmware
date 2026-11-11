@@ -36,6 +36,35 @@
             ]
         },
         {
+            "name": "hi-yaka-lab-lcd-parlio",
+            "sdkconfig_append": [
+                "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
+                "CONFIG_PARTITION_TABLE_CUSTOM=y",
+                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/hi-yaka-16m.csv\"",
+                "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y",
+                "CONFIG_WAKE_WORD_DISABLED=y",
+                "CONFIG_USE_ESP_WAKE_WORD=n",
+                "CONFIG_USE_DEVICE_AEC=n",
+                "CONFIG_HI_YAKA_ENABLE_DISPLAY=y",
+                "CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y"
+            ]
+        },
+        {
+            "name": "hi-yaka-lab-lcd-gpio",
+            "sdkconfig_append": [
+                "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
+                "CONFIG_PARTITION_TABLE_CUSTOM=y",
+                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/hi-yaka-16m.csv\"",
+                "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y",
+                "CONFIG_WAKE_WORD_DISABLED=y",
+                "CONFIG_USE_ESP_WAKE_WORD=n",
+                "CONFIG_USE_DEVICE_AEC=n",
+                "CONFIG_HI_YAKA_ENABLE_DISPLAY=y",
+                "CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y",
+                "CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC=y"
+            ]
+        },
+        {
             "name": "hi-yaka-lab-headless",
             "sdkconfig_append": [
                 "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",

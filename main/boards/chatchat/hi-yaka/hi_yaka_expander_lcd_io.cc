@@ -8,6 +8,10 @@
 #include <new>
 
 #include <driver/parlio_tx.h>
+#if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+#include <driver/gpio.h>
+#include <esp_rom_sys.h>
+#endif
 #include <esp_heap_caps.h>
 #include <esp_lcd_panel_commands.h>
 #include <esp_lcd_panel_io_interface.h>
@@ -37,6 +41,7 @@ ExpanderLcdIo* ToContext(esp_lcd_panel_io_t* io) {
     return reinterpret_cast<ExpanderLcdIo*>(io);
 }
 
+#if !CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
 void EncodeSerialBytes(const uint8_t* source, size_t size, uint8_t* destination) {
     // ESP32-C6 PARLIO cannot reliably terminate sub-32-bit DMA transfers. Use
     // a four-bit parallel bus with only data line 0 connected. Each source
@@ -58,17 +63,35 @@ void EncodeSerialBytes(const uint8_t* source, size_t size, uint8_t* destination)
             ((value & 0x01U) != 0 ? 0x01U : 0x00U);
     }
 }
+#endif
 
 esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
     if (size == 0) {
         return ESP_OK;
     }
-    if (context == nullptr || context->tx_unit == nullptr ||
-        context->encoded_buffer == nullptr || data == nullptr) {
+    if (context == nullptr || data == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }
 
     const auto* source = static_cast<const uint8_t*>(data);
+#if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+    // Mode 0: the module latches SDA on SCL's rising edge. The 1 us holds
+    // make this an independent, deliberately slow reference transport.
+    for (size_t index = 0; index < size; ++index) {
+        for (int bit = 7; bit >= 0; --bit) {
+            gpio_set_level(YAKA_LCD_MOSI_GPIO, (source[index] >> bit) & 1U);
+            esp_rom_delay_us(1);
+            gpio_set_level(YAKA_LCD_SCLK_GPIO, 1);
+            esp_rom_delay_us(1);
+            gpio_set_level(YAKA_LCD_SCLK_GPIO, 0);
+        }
+    }
+    gpio_set_level(YAKA_LCD_MOSI_GPIO, 0);
+    return ESP_OK;
+#else
+    if (context->tx_unit == nullptr || context->encoded_buffer == nullptr) {
+        return ESP_ERR_INVALID_STATE;
+    }
     parlio_transmit_config_t transmit_config = {};
     transmit_config.idle_value = 0;
 
@@ -88,6 +111,7 @@ esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
         size -= chunk_size;
     }
     return ESP_OK;
+#endif
 }
 
 esp_err_t FinishTransaction(ExpanderLcdIo* context, esp_err_t result) {
@@ -226,18 +250,39 @@ esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
         return ESP_ERR_NO_MEM;
     }
     context->expander = expander;
+#if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+    gpio_config_t gpio_setup = {};
+    gpio_setup.pin_bit_mask = (1ULL << YAKA_LCD_MOSI_GPIO) | (1ULL << YAKA_LCD_SCLK_GPIO);
+    gpio_setup.mode = GPIO_MODE_OUTPUT;
+    gpio_setup.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_setup.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    gpio_setup.intr_type = GPIO_INTR_DISABLE;
+    esp_err_t result = gpio_config(&gpio_setup);
+    if (result == ESP_OK) {
+        result = gpio_set_level(YAKA_LCD_SCLK_GPIO, 0);
+    }
+    if (result == ESP_OK) {
+        result = gpio_set_level(YAKA_LCD_MOSI_GPIO, 0);
+    }
+    if (result != ESP_OK) {
+        delete context;
+        return result;
+    }
+#else
     context->encoded_buffer = static_cast<uint8_t*>(heap_caps_aligned_alloc(
         sizeof(uint32_t), kEncodedChunkBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
     if (context->encoded_buffer == nullptr) {
         delete context;
         return ESP_ERR_NO_MEM;
     }
+#endif
     context->base.rx_param = RxParam;
     context->base.tx_param = TxParam;
     context->base.tx_color = TxColor;
     context->base.del = DeleteIo;
     context->base.register_event_callbacks = RegisterCallbacks;
 
+#if !CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
     parlio_tx_unit_config_t tx_config = {};
     tx_config.clk_src = PARLIO_CLK_SRC_DEFAULT;
     tx_config.clk_in_gpio_num = GPIO_NUM_NC;
@@ -267,6 +312,7 @@ esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
         delete context;
         return result;
     }
+#endif
 
     *out_io = &context->base;
     return ESP_OK;

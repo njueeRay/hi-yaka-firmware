@@ -352,6 +352,12 @@ private:
             return;
         }
 
+#if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: slow GPIO diagnostic");
+#else
+        ESP_LOGI(TAG, "LCD transport: PARLIO");
+#endif
+
         esp_lcd_panel_io_handle_t panel_io = nullptr;
         esp_err_t result = hi_yaka_new_expander_lcd_io(
             pca9557_.get(), YAKA_LCD_PIXEL_CLOCK_HZ, &panel_io);
@@ -384,6 +390,12 @@ private:
         }
         if (result == ESP_OK) {
             result = esp_lcd_panel_init(panel);
+        }
+        if (result == ESP_OK) {
+            // esp_lcd_panel_init() leaves ST7789 display output disabled.
+            // Enable it before the visual color probe; otherwise successful
+            // RAM writes cannot be interpreted as a visible-panel test.
+            result = esp_lcd_panel_disp_on_off(panel, true);
         }
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "ST7789 initialization failed: %s", esp_err_to_name(result));
@@ -448,10 +460,17 @@ private:
         uint8_t configuration = 0;
         const esp_err_t backlight_readback =
             pca9557_->ReadBack(&output, &configuration);
-        ESP_LOGI(TAG,
-                 "LCD backlight latch: result=%s output=0x%02X config=0x%02X BL=%u",
+        ESP_LOGI(TAG, "LCD backlight latch: result=%s output=0x%02X config=0x%02X BL=%u",
                  esp_err_to_name(backlight_readback), output, configuration,
                  static_cast<unsigned>((output >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
+        uint8_t pin_levels = 0;
+        const esp_err_t pin_readback = pca9557_->ReadPinLevels(&pin_levels);
+        ESP_LOGI(TAG, "LCD PCA9557 pin levels: result=%s input=0x%02X RST=%u CS=%u DC=%u BL=%u",
+                 esp_err_to_name(pin_readback), pin_levels,
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_RST_BIT) & 1U),
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_CS_BIT) & 1U),
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_DC_BIT) & 1U),
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
         ESP_LOGW(TAG, "LCD candidate enabled: orientation/color/inversion require L1 verification");
     }
 #endif
