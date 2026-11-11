@@ -14,8 +14,9 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertEqual(config["manufacturer"], "chatchat")
         self.assertEqual(config["type"], "hi-yaka")
         self.assertEqual(config["target"], "esp32c6")
-        self.assertEqual(len(config["builds"]), 5)
-        build = config["builds"][0]
+        builds = {build["name"]: build for build in config["builds"]}
+        self.assertEqual(len(builds), len(config["builds"]))
+        build = builds["hi-yaka"]
         self.assertEqual(build["name"], "hi-yaka")
         options = set(build["sdkconfig_append"])
         self.assertFalse(any(option.startswith("CONFIG_SPIRAM=") for option in options))
@@ -24,7 +25,7 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertNotIn("CONFIG_USE_DEVICE_AEC=y", options)
         self.assertFalse(any(option.startswith("CONFIG_HI_YAKA_ENABLE_") for option in options))
 
-        lab_build = config["builds"][1]
+        lab_build = builds["hi-yaka-lab"]
         self.assertEqual(lab_build["name"], "hi-yaka-lab")
         lab_options = set(lab_build["sdkconfig_append"])
         self.assertIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", lab_options)
@@ -33,7 +34,17 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", lab_options)
         self.assertNotIn("CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME=y", lab_options)
 
-        headless_build = config["builds"][2]
+        parlio_options = set(builds["hi-yaka-lab-lcd-parlio"]["sdkconfig_append"])
+        gpio_options = set(builds["hi-yaka-lab-lcd-gpio"]["sdkconfig_append"])
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", parlio_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", parlio_options)
+        self.assertEqual(
+            gpio_options - parlio_options,
+            {"CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC=y"},
+        )
+        self.assertFalse(parlio_options - gpio_options)
+
+        headless_build = builds["hi-yaka-lab-headless"]
         self.assertEqual(headless_build["name"], "hi-yaka-lab-headless")
         headless_options = set(headless_build["sdkconfig_append"])
         self.assertNotIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", headless_options)
@@ -43,13 +54,13 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y", headless_options)
         self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", headless_options)
 
-        baseline_build = config["builds"][3]
+        baseline_build = builds["hi-yaka-lab-audio-baseline"]
         self.assertEqual(baseline_build["name"], "hi-yaka-lab-audio-baseline")
         baseline_options = set(baseline_build["sdkconfig_append"])
         self.assertIn("CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS=y", baseline_options)
         self.assertNotIn("CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS=y", baseline_options)
 
-        audio_ab_build = config["builds"][4]
+        audio_ab_build = builds["hi-yaka-lab-audio-ab"]
         self.assertEqual(audio_ab_build["name"], "hi-yaka-lab-audio-ab")
         audio_ab_options = set(audio_ab_build["sdkconfig_append"])
         self.assertNotIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", audio_ab_options)
