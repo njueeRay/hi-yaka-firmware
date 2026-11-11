@@ -6,21 +6,34 @@
 #include "config.h"
 #include "display/lcd_display.h"
 #include "hi_yaka_adc.h"
+#include "hi_yaka_audio_ab.h"
 #include "hi_yaka_expander_lcd_io.h"
 #include "hi_yaka_feedback.h"
 #include "hi_yaka_input.h"
 #include "hi_yaka_pca9557.h"
+#include "hi_yaka_pn532.h"
+#include "hi_yaka_qmi8658a.h"
 #include "hi_yaka_storage.h"
+#include "hi_yaka_wav_writer.h"
 #include "recording_store.h"
 #include "runtime_adapter.h"
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <inttypes.h>
 #include <memory>
+#include <vector>
 
+#include <sdkconfig.h>
+#include <driver/gpio.h>
 #include <driver/i2c_master.h>
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+#include <driver/pulse_cnt.h>
+#include <esp_rom_sys.h>
+#endif
 #include <esp_err.h>
 #include <esp_flash.h>
 #include <esp_heap_caps.h>
@@ -28,9 +41,9 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <sdkconfig.h>
 
 #define TAG "HiYaKa"
 
@@ -57,6 +70,44 @@ constexpr std::array<ExpectedI2cDevice, 5> kExpectedI2cDevices = {{
     {YAKA_QMI8658A_I2C_ADDRESS, "QMI8658A"},
 }};
 
+const char* PhysicalKeyName(hi_yaka::PhysicalKey key) {
+    constexpr std::array<const char*, 8> kNames = {{
+        "UP", "DOWN", "LEFT", "RIGHT", "ACT_A", "ACT_B", "PWR_A", "PWR_B",
+    }};
+    const auto index = static_cast<std::size_t>(key);
+    return index < kNames.size() ? kNames[index] : "UNKNOWN";
+}
+
+const char* NfcPollResultName(HiYaKaNfcPollResult result) {
+    switch (result) {
+        case HiYaKaNfcPollResult::kFound:
+            return "found";
+        case HiYaKaNfcPollResult::kNoTarget:
+            return "no-target";
+        case HiYaKaNfcPollResult::kTimeout:
+            return "timeout";
+        case HiYaKaNfcPollResult::kTransportError:
+            return "transport-error";
+        case HiYaKaNfcPollResult::kProtocolError:
+            return "protocol-error";
+        case HiYaKaNfcPollResult::kNoMemory:
+            return "no-memory";
+        case HiYaKaNfcPollResult::kInvalidState:
+            return "invalid-state";
+    }
+    return "unknown";
+}
+
+uint32_t NfcUidFingerprint(const HiYaKaNfcTag& tag) {
+    // FNV-1a is deliberately non-reversible in normal logs. The full UID is
+    // retained only in RAM for the future approved business mapping.
+    uint32_t hash = 2166136261U;
+    for (uint8_t index = 0; index < tag.uid_length; ++index) {
+        hash = (hash ^ tag.uid[index]) * 16777619U;
+    }
+    return hash;
+}
+
 class ExpanderBacklight final : public Backlight {
 public:
     explicit ExpanderBacklight(HiYaKaPca9557& expander) : expander_(expander) {}
@@ -75,6 +126,109 @@ private:
     HiYaKaPca9557& expander_;
 };
 
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+void LogI2sPadEdges(const char* signal, gpio_num_t pin, uint32_t sample_us) {
+    pcnt_unit_config_t unit_config = {};
+    unit_config.high_limit = 30000;
+    unit_config.low_limit = -1;
+    pcnt_unit_handle_t unit = nullptr;
+    pcnt_channel_handle_t channel = nullptr;
+    esp_err_t result = pcnt_new_unit(&unit_config, &unit);
+    bool enabled = false;
+    bool started = false;
+    int rising_edges = 0;
+    int64_t elapsed_us = 0;
+
+    if (result == ESP_OK) {
+        pcnt_chan_config_t channel_config = {};
+        channel_config.edge_gpio_num = pin;
+        channel_config.level_gpio_num = -1;
+        result = pcnt_new_channel(unit, &channel_config, &channel);
+    }
+    if (result == ESP_OK) {
+        result = pcnt_channel_set_edge_action(channel, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
+                                              PCNT_CHANNEL_EDGE_ACTION_HOLD);
+    }
+    if (result == ESP_OK) {
+        result = pcnt_unit_enable(unit);
+        enabled = result == ESP_OK;
+    }
+    if (result == ESP_OK) {
+        result = pcnt_unit_clear_count(unit);
+    }
+    if (result == ESP_OK) {
+        result = pcnt_unit_start(unit);
+        started = result == ESP_OK;
+    }
+    if (result == ESP_OK) {
+        const int64_t started_at = esp_timer_get_time();
+        esp_rom_delay_us(sample_us);
+        elapsed_us = esp_timer_get_time() - started_at;
+        result = pcnt_unit_get_count(unit, &rising_edges);
+    }
+
+    if (started) {
+        pcnt_unit_stop(unit);
+    }
+    if (enabled) {
+        pcnt_unit_disable(unit);
+    }
+    if (channel != nullptr) {
+        pcnt_del_channel(channel);
+    }
+    if (unit != nullptr) {
+        pcnt_del_unit(unit);
+    }
+    ESP_LOGI(TAG, "BRINGUP I2S pad edges: %s GPIO%d result=%s rising=%d elapsed_us=%lld",
+             signal, static_cast<int>(pin), esp_err_to_name(result), rising_edges,
+             static_cast<long long>(elapsed_us));
+}
+
+class HiYaKaDiagnosticAudioCodec final : public BoxAudioCodec {
+public:
+    using BoxAudioCodec::BoxAudioCodec;
+
+    void OutputData(std::vector<int16_t>& data) override {
+        BoxAudioCodec::OutputData(data);
+        if (capture_complete_ || data.empty()) {
+            return;
+        }
+        if (!capture_attempted_) {
+            capture_attempted_ = true;
+            if (!writer_.Open("/sdcard/diagnostics/decoded-output.wav",
+                              output_sample_rate(), output_channels())) {
+                capture_complete_ = true;
+                return;
+            }
+        }
+        constexpr uint32_t kMaximumSeconds = 30;
+        const uint32_t maximum_bytes =
+            output_sample_rate() * output_channels() * sizeof(int16_t) * kMaximumSeconds;
+        const uint32_t remaining_bytes = maximum_bytes - writer_.data_bytes();
+        const std::size_t samples_to_write =
+            std::min<std::size_t>(data.size(), remaining_bytes / sizeof(int16_t));
+        if (!writer_.Append(data.data(), samples_to_write) ||
+            writer_.data_bytes() >= maximum_bytes) {
+            writer_.Close();
+            capture_complete_ = true;
+        }
+    }
+
+    void EnableOutput(bool enable) override {
+        BoxAudioCodec::EnableOutput(enable);
+        if (!enable && writer_.open()) {
+            writer_.Close();
+            capture_complete_ = true;
+        }
+    }
+
+private:
+    HiYaKaWavWriter writer_;
+    bool capture_attempted_ = false;
+    bool capture_complete_ = false;
+};
+#endif
+
 }  // namespace
 
 class HiYaKaBoard : public WifiBoard {
@@ -88,9 +242,37 @@ private:
     std::unique_ptr<HiYaKaFeedback> feedback_;
     std::unique_ptr<BoxAudioCodec> audio_codec_;
     std::unique_ptr<HiYaKaStorage> storage_;
+    std::unique_ptr<HiYaKaPn532> pn532_;
+    std::unique_ptr<HiYaKaQmi8658a> qmi8658a_;
     std::unique_ptr<hi_yaka::RecordingStore> recording_store_;
     std::unique_ptr<hi_yaka::RecordingStoragePortAdapter> recording_port_;
     bool pca_safe_state_verified_ = false;
+    std::atomic<bool> nfc_scan_running_{false};
+    std::atomic<bool> nfc_scan_cancelled_{false};
+    std::atomic<bool> imu_monitoring_{false};
+    std::atomic<bool> imu_task_running_{false};
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    std::atomic<bool> lab_record_active_{false};
+    std::atomic<bool> lab_record_stop_requested_{false};
+    uint32_t lab_record_sequence_ = 0;
+#endif
+
+    void ForcePaDisabled() {
+        gpio_config_t config = {};
+        config.pin_bit_mask = 1ULL << YAKA_AUDIO_PA_ENABLE_GPIO;
+        config.mode = GPIO_MODE_OUTPUT;
+        config.pull_up_en = GPIO_PULLUP_DISABLE;
+        config.pull_down_en = GPIO_PULLDOWN_ENABLE;
+        config.intr_type = GPIO_INTR_DISABLE;
+        const esp_err_t result = gpio_config(&config);
+        if (result == ESP_OK) {
+            gpio_set_level(YAKA_AUDIO_PA_ENABLE_GPIO, 0);
+            ESP_LOGI(TAG, "PA safety interlock active: GPIO%d forced low",
+                     static_cast<int>(YAKA_AUDIO_PA_ENABLE_GPIO));
+        } else {
+            ESP_LOGE(TAG, "PA safety interlock failed: %s", esp_err_to_name(result));
+        }
+    }
 
     void LogPlatformBaseline() {
         uint32_t flash_id = 0;
@@ -132,16 +314,20 @@ private:
     }
 
     void InitializePca9557SafeState() {
-        esp_err_t probe_result =
-            i2c_master_probe(i2c_bus_, YAKA_PCA9557_I2C_ADDRESS, 100);
-        if (probe_result != ESP_OK) {
-            ESP_LOGE(TAG, "PCA9557 probe failed at 0x%02X: %s",
-                     YAKA_PCA9557_I2C_ADDRESS, esp_err_to_name(probe_result));
-            return;
-        }
-
         pca9557_ = std::make_unique<HiYaKaPca9557>(i2c_bus_);
-        esp_err_t result = pca9557_->InitializeSafe();
+        esp_err_t result = ESP_FAIL;
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            result = pca9557_->InitializeSafe();
+            if (result == ESP_OK) {
+                if (attempt > 0) {
+                    ESP_LOGW(TAG, "PCA9557 safe state recovered on attempt %d", attempt + 1);
+                }
+                break;
+            }
+            if (attempt < 4) {
+                vTaskDelay(pdMS_TO_TICKS(25));
+            }
+        }
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "PCA9557 safe initialization failed: %s", esp_err_to_name(result));
             pca9557_.reset();
@@ -151,8 +337,7 @@ private:
         uint8_t output = 0;
         uint8_t configuration = 0;
         esp_err_t readback_result = pca9557_->ReadBack(&output, &configuration);
-        if (readback_result == ESP_OK &&
-            output == YAKA_PCA9557_SAFE_OUTPUT &&
+        if (readback_result == ESP_OK && output == YAKA_PCA9557_SAFE_OUTPUT &&
             configuration == YAKA_PCA9557_SAFE_CONFIGURATION) {
             ESP_LOGI(TAG, "PCA9557 safe state verified: output=0x%02X config=0x%02X", output,
                      configuration);
@@ -169,6 +354,12 @@ private:
             ESP_LOGE(TAG, "display skipped: PCA9557 is not ready");
             return;
         }
+
+#if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: slow GPIO diagnostic");
+#else
+        ESP_LOGI(TAG, "LCD transport: PARLIO");
+#endif
 
         esp_lcd_panel_io_handle_t panel_io = nullptr;
         esp_err_t result = hi_yaka_new_expander_lcd_io(
@@ -203,6 +394,22 @@ private:
         if (result == ESP_OK) {
             result = esp_lcd_panel_init(panel);
         }
+        if (result == ESP_OK) {
+            result = esp_lcd_panel_swap_xy(panel, true);
+        }
+        if (result == ESP_OK) {
+            result = esp_lcd_panel_mirror(panel, true, false);
+        }
+        if (result == ESP_OK) {
+            result = esp_lcd_panel_set_gap(
+                panel, YAKA_LCD_VIEW_GAP_X, YAKA_LCD_VIEW_GAP_Y);
+        }
+        if (result == ESP_OK) {
+            // esp_lcd_panel_init() leaves ST7789 display output disabled.
+            // Enable it before the visual color probe; otherwise successful
+            // RAM writes cannot be interpreted as a visible-panel test.
+            result = esp_lcd_panel_disp_on_off(panel, true);
+        }
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "ST7789 initialization failed: %s", esp_err_to_name(result));
             if (panel != nullptr) {
@@ -212,13 +419,101 @@ private:
             return;
         }
 
-        // Geometry is frozen by the display module. Orientation, offsets,
-        // inversion and color order are deliberately provisional until L1.
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        // Show unmistakable colors before LVGL can replace the panel contents.
+        // The panel has no readback path, so API success is only transport evidence.
+        constexpr size_t kRowsPerTransfer = 20;
+        constexpr std::array<uint16_t, 5> kTestColors = {
+            0xF800, 0x07E0, 0x001F, 0xFFFF, 0x0000};
+        constexpr std::array<const char*, 5> kColorNames = {
+            "red", "green", "blue", "white", "black"};
+        auto* test_pixels = static_cast<uint16_t*>(heap_caps_malloc(
+            YAKA_LCD_VIEW_WIDTH * kRowsPerTransfer * sizeof(uint16_t),
+            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        if (test_pixels != nullptr) {
+            const esp_err_t light_result =
+                pca9557_->SetOutputBit(YAKA_PCA9557_LCD_BL_BIT, true);
+            ESP_LOGI(TAG, "LCD color test backlight=%s",
+                     esp_err_to_name(light_result));
+            for (size_t color_index = 0; color_index < kTestColors.size();
+                 ++color_index) {
+                std::fill_n(test_pixels, YAKA_LCD_VIEW_WIDTH * kRowsPerTransfer,
+                            kTestColors[color_index]);
+                esp_err_t draw_result = ESP_OK;
+                for (int y = 0; y < YAKA_LCD_VIEW_HEIGHT;
+                     y += static_cast<int>(kRowsPerTransfer)) {
+                    draw_result = esp_lcd_panel_draw_bitmap(
+                        panel, 0, y, YAKA_LCD_VIEW_WIDTH,
+                        std::min(y + static_cast<int>(kRowsPerTransfer),
+                                 YAKA_LCD_VIEW_HEIGHT),
+                        test_pixels);
+                    if (draw_result != ESP_OK) {
+                        break;
+                    }
+                }
+                ESP_LOGI(TAG, "LCD color test %s: %s",
+                         kColorNames[color_index],
+                         esp_err_to_name(draw_result));
+                vTaskDelay(pdMS_TO_TICKS(1500));
+            }
+            free(test_pixels);
+        } else {
+            ESP_LOGE(TAG, "LCD color test skipped: no internal buffer");
+        }
+#endif
+
+        // Landscape orientation and the centered RAM gap were visually checked
+        // on one board; repeated cold starts and refresh stability remain open.
         display_ = std::make_unique<SpiLcdDisplay>(
-            panel_io, panel, YAKA_LCD_WIDTH, YAKA_LCD_HEIGHT, YAKA_LCD_OFFSET_X,
-            YAKA_LCD_OFFSET_Y, false, false, false);
+            panel_io, panel, YAKA_LCD_VIEW_WIDTH, YAKA_LCD_VIEW_HEIGHT,
+            YAKA_LCD_OFFSET_X, YAKA_LCD_OFFSET_Y, true, false, true);
         backlight_ = std::make_unique<ExpanderBacklight>(*pca9557_);
+        backlight_->RestoreBrightness();
+        uint8_t output = 0;
+        uint8_t configuration = 0;
+        const esp_err_t backlight_readback =
+            pca9557_->ReadBack(&output, &configuration);
+        ESP_LOGI(TAG, "LCD backlight latch: result=%s output=0x%02X config=0x%02X BL=%u",
+                 esp_err_to_name(backlight_readback), output, configuration,
+                 static_cast<unsigned>((output >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
+        uint8_t pin_levels = 0;
+        const esp_err_t pin_readback = pca9557_->ReadPinLevels(&pin_levels);
+        ESP_LOGI(TAG, "LCD PCA9557 pin levels: result=%s input=0x%02X RST=%u CS=%u DC=%u BL=%u",
+                 esp_err_to_name(pin_readback), pin_levels,
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_RST_BIT) & 1U),
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_CS_BIT) & 1U),
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_DC_BIT) & 1U),
+                 static_cast<unsigned>((pin_levels >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
         ESP_LOGW(TAG, "LCD candidate enabled: orientation/color/inversion require L1 verification");
+    }
+#endif
+
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+    void InitializeAuxiliarySensors() {
+        const esp_err_t imu_probe =
+            i2c_master_probe(i2c_bus_, YAKA_QMI8658A_I2C_ADDRESS, 100);
+        if (imu_probe == ESP_OK) {
+            qmi8658a_ = std::make_unique<HiYaKaQmi8658a>(i2c_bus_);
+            const esp_err_t result = qmi8658a_->Initialize();
+            if (result != ESP_OK) {
+                ESP_LOGE(TAG, "QMI8658A initialization failed: %s", esp_err_to_name(result));
+                qmi8658a_.reset();
+            }
+        } else {
+            ESP_LOGW(TAG, "QMI8658A unavailable at 0x%02X: %s",
+                     YAKA_QMI8658A_I2C_ADDRESS, esp_err_to_name(imu_probe));
+        }
+
+        // A PN532 leaving low-power may NACK the address-only probe that wakes
+        // it. Do not gate the real transport on that probe: the driver performs
+        // the required wake delay, retries and firmware-version transaction.
+        pn532_ = std::make_unique<HiYaKaPn532>(i2c_bus_);
+        const esp_err_t nfc_result = pn532_->Initialize();
+        if (nfc_result != ESP_OK) {
+            ESP_LOGE(TAG, "PN532 initialization failed: %s",
+                     esp_err_to_name(nfc_result));
+            pn532_.reset();
+        }
     }
 #endif
 
@@ -243,6 +538,11 @@ private:
 
 #if CONFIG_HI_YAKA_ENABLE_AUDIO
     void InitializeAudio() {
+#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
+        // The input-only A/B probe must run before the paired-codec gate.
+        // An intermittent ES8311 ACK must not hide ES7210 receive evidence.
+        HiYaKaRunAudioAbDiagnostics(i2c_bus_);
+#endif
         const esp_err_t output_probe =
             i2c_master_probe(i2c_bus_, YAKA_ES8311_I2C_ADDRESS, 100);
         const esp_err_t input_probe =
@@ -253,16 +553,64 @@ private:
             return;
         }
 
-        // First L1 candidate intentionally selects MIC1 (voice) plus MIC3
-        // (playback reference). ES7210 TDM slot order and the second physical
-        // microphone remain explicit M3 measurements, not assumptions.
+        // Lab builds isolate both physical microphones on a standard stereo
+        // frame. This distinguishes a TDM/clock mismatch from a dead SDOUT1
+        // path; the production candidate retains its three-channel TDM plan.
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        audio_codec_ = std::make_unique<HiYaKaDiagnosticAudioCodec>(
+#else
         audio_codec_ = std::make_unique<BoxAudioCodec>(
+#endif
             i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             YAKA_AUDIO_MCLK_GPIO, YAKA_AUDIO_BCLK_GPIO, YAKA_AUDIO_WS_GPIO,
             YAKA_AUDIO_DOUT_GPIO, YAKA_AUDIO_DIN_GPIO, YAKA_AUDIO_PA_ENABLE_GPIO,
-            YAKA_ES8311_I2C_ADDRESS, YAKA_ES7210_I2C_ADDRESS, true, 24.0f, 2, 0.0f,
-            YAKA_I2C_PORT, ES7210_SEL_MIC1 | ES7210_SEL_MIC3);
-        ESP_LOGW(TAG, "audio candidate enabled: slot/gain/PA timing require L1/L2 verification");
+            YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS,
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+            // Capture both ES7210 slots in the lab image. A single selected
+            // slot makes esp_codec_dev reconfigure the RX interface to mono,
+            // which hides whether MIC2 appears in the other physical slot.
+            true, 24.0f, 1, 24.0f, YAKA_I2C_PORT,
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true);
+#else
+            true, 24.0f, 2, 0.0f, YAKA_I2C_PORT,
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false, false);
+#endif
+        ESP_LOGW(TAG,
+                 "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
+#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS || CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS
+        audio_codec_->EnableInput(true);
+        vTaskDelay(pdMS_TO_TICKS(150));
+        audio_codec_->LogInputDiagnostics();
+        std::vector<int16_t> baseline(512, 0);
+        const bool baseline_read = audio_codec_->InputData(baseline);
+        std::size_t baseline_nonzero = 0;
+        int baseline_peak = 0;
+        for (int16_t sample : baseline) {
+            baseline_nonzero += sample != 0;
+            baseline_peak = std::max(baseline_peak, sample < 0 ? -static_cast<int>(sample)
+                                                       : static_cast<int>(sample));
+        }
+        ESP_LOGI(TAG, "audio C paired baseline: read=%d nonzero=%u peak=%d first=%d,%d,%d,%d",
+                 baseline_read, static_cast<unsigned>(baseline_nonzero), baseline_peak,
+                 baseline[0], baseline[1], baseline[2], baseline[3]);
+        vTaskDelay(pdMS_TO_TICKS(25000));
+        audio_codec_->LogInputDiagnostics();
+        LogI2sPadEdges("MCLK", YAKA_AUDIO_MCLK_GPIO, 1000);
+        LogI2sPadEdges("BCLK", YAKA_AUDIO_BCLK_GPIO, 10000);
+        LogI2sPadEdges("WS", YAKA_AUDIO_WS_GPIO, 20000);
+        LogI2sPadEdges("SDOUT1", YAKA_AUDIO_DIN_GPIO, 20000);
+        ESP_LOGI(TAG, "C GPIO13 weak pulldown set=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_PULLDOWN_ONLY)));
+        vTaskDelay(pdMS_TO_TICKS(100));
+        audio_codec_->LogInputDiagnostics();
+        ESP_LOGI(TAG, "C GPIO13 weak pullup set=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_PULLUP_ONLY)));
+        vTaskDelay(pdMS_TO_TICKS(100));
+        audio_codec_->LogInputDiagnostics();
+        ESP_LOGI(TAG, "C GPIO13 restore floating=%s",
+                 esp_err_to_name(gpio_set_pull_mode(YAKA_AUDIO_DIN_GPIO, GPIO_FLOATING)));
+        audio_codec_->EnableInput(false);
+#endif
     }
 #endif
 
@@ -279,6 +627,98 @@ private:
     }
 #endif
 
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    void ToggleLabRecording() {
+        if (lab_record_active_.load()) {
+            lab_record_stop_requested_.store(true);
+            if (feedback_ != nullptr) {
+                feedback_->SetLabRecordingIndicator(false);
+            }
+            ESP_LOGI(TAG, "BRINGUP ACT_B microphone stop requested");
+            return;
+        }
+        if (audio_codec_ == nullptr || storage_ == nullptr || !storage_->ready() ||
+            feedback_ == nullptr) {
+            ESP_LOGE(TAG, "BRINGUP ACT_B microphone unavailable: codec=%d TF=%d light=%d",
+                     audio_codec_ != nullptr, storage_ != nullptr && storage_->ready(),
+                     feedback_ != nullptr);
+            return;
+        }
+
+        lab_record_stop_requested_.store(false);
+        lab_record_active_.store(true);
+        ++lab_record_sequence_;
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                char path[72] = {};
+                std::snprintf(path, sizeof(path),
+                              "/sdcard/diagnostics/act-b-%03lu.wav",
+                              static_cast<unsigned long>(self->lab_record_sequence_));
+                HiYaKaWavWriter writer;
+                const std::size_t channels = self->audio_codec_->input_channels();
+                uint64_t samples_written = 0;
+                int peak = 0;
+                if (writer.Open(path, self->audio_codec_->input_sample_rate(), channels)) {
+                    self->audio_codec_->EnableInput(true);
+                    vTaskDelay(pdMS_TO_TICKS(150));
+                    self->audio_codec_->LogInputDiagnostics();
+                    LogI2sPadEdges("MCLK", YAKA_AUDIO_MCLK_GPIO, 1000);
+                    LogI2sPadEdges("BCLK", YAKA_AUDIO_BCLK_GPIO, 10000);
+                    LogI2sPadEdges("WS", YAKA_AUDIO_WS_GPIO, 20000);
+                    LogI2sPadEdges("SDOUT1", YAKA_AUDIO_DIN_GPIO, 20000);
+                    ESP_LOGI(TAG, "BRINGUP I2S GPIO13 input level=%d; GPIO12/13 routing follows",
+                             gpio_get_level(YAKA_AUDIO_DIN_GPIO));
+                    gpio_dump_io_configuration(stdout,
+                                               (1ULL << YAKA_AUDIO_WS_GPIO) |
+                                               (1ULL << YAKA_AUDIO_DIN_GPIO));
+                    ESP_LOGI(TAG, "BRINGUP MIC RECORD START: %s channels=%u; R42/R45 measurement valid while red LEDs are on",
+                             path, static_cast<unsigned>(channels));
+                    constexpr std::size_t kFramesPerChunk = 320;
+                    constexpr uint32_t kMaximumSeconds = 180;
+                    const uint64_t sample_limit =
+                        static_cast<uint64_t>(self->audio_codec_->input_sample_rate()) *
+                        channels * kMaximumSeconds;
+                    std::vector<int16_t> samples(kFramesPerChunk * channels, 0);
+                    while (!self->lab_record_stop_requested_.load() &&
+                           samples_written < sample_limit) {
+                        if (!self->audio_codec_->InputData(samples) ||
+                            !writer.Append(samples.data(), samples.size())) {
+                            ESP_LOGE(TAG, "BRINGUP MIC RECORD read/write failed");
+                            break;
+                        }
+                        for (int16_t sample : samples) {
+                            const int magnitude = sample < 0 ? -static_cast<int>(sample)
+                                                             : static_cast<int>(sample);
+                            peak = std::max(peak, magnitude);
+                        }
+                        samples_written += samples.size();
+                    }
+                    self->audio_codec_->EnableInput(false);
+                }
+                const bool closed = writer.Close();
+                ESP_LOGI(TAG, "BRINGUP MIC RECORD STOP: %s samples=%llu peak=%d wav_closed=%d",
+                         path, static_cast<unsigned long long>(samples_written), peak,
+                         closed);
+                Application::GetInstance().Schedule([self]() {
+                    if (self->feedback_ != nullptr) {
+                        self->feedback_->SetLabRecordingIndicator(false);
+                    }
+                    self->lab_record_active_.store(false);
+                });
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_mic_act_b", 6144, this, 4, nullptr);
+        if (created != pdPASS) {
+            lab_record_active_.store(false);
+            ESP_LOGE(TAG, "BRINGUP ACT_B microphone task creation failed");
+            return;
+        }
+        feedback_->SetLabRecordingIndicator(true);
+        ESP_LOGI(TAG, "BRINGUP ACT_B microphone start requested; red LEDs on");
+    }
+#endif
+
 #if CONFIG_HI_YAKA_ENABLE_INPUT
     void InitializeInput() {
         if (adc_ == nullptr) {
@@ -287,13 +727,29 @@ private:
         }
         input_ = std::make_unique<HiYaKaInput>(*adc_);
         const esp_err_t result = input_->Initialize(
-            [](hi_yaka::PhysicalKey key, hi_yaka::KeyGesture gesture) {
-                Application::GetInstance().Schedule([key, gesture]() {
+            [this](hi_yaka::PhysicalKey key, hi_yaka::KeyGesture gesture) {
+                Application::GetInstance().Schedule([this, key, gesture]() {
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+                    ESP_LOGI(TAG, "BRINGUP key: name=%s gesture=%s",
+                             PhysicalKeyName(key),
+                             gesture == hi_yaka::KeyGesture::kLongPress ? "LONG" : "PRESS");
+#if CONFIG_HI_YAKA_ENABLE_FEEDBACK
+                    if (key == hi_yaka::PhysicalKey::kPrimary &&
+                        gesture == hi_yaka::KeyGesture::kPress && feedback_ != nullptr) {
+                        ESP_LOGI(TAG, "BRINGUP motor: PWR_A -> warning pulse 80 ms");
+                        feedback_->Emit(hi_yaka::FeedbackSignal::kWarning);
+                    }
+#endif
+                    if (key == hi_yaka::PhysicalKey::kBack &&
+                        gesture == hi_yaka::KeyGesture::kPress) {
+                        ToggleLabRecording();
+                    }
+#endif
 #if CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME
                     hi_yaka::RuntimeAdapter::Get().OnPhysicalInput(key, gesture);
 #else
-                    ESP_LOGI(TAG, "physical key=%u gesture=%u",
-                             static_cast<unsigned>(key), static_cast<unsigned>(gesture));
+                    ESP_LOGI(TAG, "physical key=%s gesture=%s", PhysicalKeyName(key),
+                             gesture == hi_yaka::KeyGesture::kLongPress ? "LONG" : "PRESS");
 #endif
                 });
             });
@@ -331,12 +787,123 @@ private:
         }
     }
 
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    void ScanI2cBusForDiagnostics() {
+        unsigned found = 0;
+        ESP_LOGI(TAG, "BRINGUP I2C scan begin: 0x08..0x77");
+        for (uint8_t address = 0x08; address <= 0x77; ++address) {
+            if (i2c_master_probe(i2c_bus_, address, 10) == ESP_OK) {
+                ESP_LOGI(TAG, "BRINGUP I2C scan found: 0x%02X", address);
+                ++found;
+            }
+        }
+        ESP_LOGI(TAG, "BRINGUP I2C scan complete: found=%u", found);
+    }
+#endif
+
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    void StartBringupDiagnostics() {
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                vTaskDelay(pdMS_TO_TICKS(4000));
+                ESP_LOGI(TAG, "BRINGUP BEGIN: bounded unified peripheral diagnostics");
+
+                if (self->pca9557_ != nullptr) {
+                    uint8_t output = 0;
+                    uint8_t configuration = 0;
+                    esp_err_t result = self->pca9557_->SetOutputBit(
+                        YAKA_PCA9557_LCD_BL_BIT, false);
+                    ESP_LOGI(TAG, "BRINGUP backlight OFF: write=%s", esp_err_to_name(result));
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    result = self->pca9557_->SetOutputBit(
+                        YAKA_PCA9557_LCD_BL_BIT, true);
+                    const esp_err_t readback =
+                        self->pca9557_->ReadBack(&output, &configuration);
+                    ESP_LOGI(TAG,
+                             "BRINGUP backlight ON: write=%s read=%s output=0x%02X config=0x%02X BL=%u",
+                             esp_err_to_name(result), esp_err_to_name(readback), output,
+                             configuration,
+                             static_cast<unsigned>((output >> YAKA_PCA9557_LCD_BL_BIT) & 1U));
+                }
+
+                ESP_LOGI(TAG, "BRINGUP PN532 delayed address probe: %s",
+                         esp_err_to_name(i2c_master_probe(self->i2c_bus_,
+                                                           YAKA_PN532_I2C_ADDRESS, 100)));
+
+                if (self->adc_ != nullptr) {
+                    int keys_mv = 0;
+                    int battery_divider_mv = 0;
+                    const esp_err_t keys_result =
+                        self->adc_->ReadMillivolts(YAKA_DPAD_ADC_CHANNEL, &keys_mv);
+                    const esp_err_t battery_result =
+                        self->adc_->ReadMillivolts(YAKA_BATTERY_ADC_CHANNEL,
+                                                  &battery_divider_mv);
+                    ESP_LOGI(TAG,
+                             "BRINGUP ADC idle: keys=%d mV (%s), battery-divider=%d mV (%s)",
+                             keys_mv, esp_err_to_name(keys_result), battery_divider_mv,
+                             esp_err_to_name(battery_result));
+                }
+
+                if (self->feedback_ != nullptr) {
+                    self->feedback_->RunBringupSelfTest();
+                }
+
+                ESP_LOGI(TAG,
+                         "BRINGUP microphone: press ACT_B to start/stop WAV; steady red RGB and LED array mean MICBIAS is active");
+
+                if (self->qmi8658a_ != nullptr) {
+                    HiYaKaImuSample sample{};
+                    const esp_err_t result = self->qmi8658a_->ReadSample(&sample, 200);
+                    ESP_LOGI(TAG,
+                             "BRINGUP IMU: result=%s accel_g=[%.3f %.3f %.3f] gyro_dps=[%.2f %.2f %.2f] temp=%.2fC",
+                             esp_err_to_name(result), sample.acceleration_g[0],
+                             sample.acceleration_g[1], sample.acceleration_g[2],
+                             sample.angular_rate_dps[0], sample.angular_rate_dps[1],
+                             sample.angular_rate_dps[2], sample.temperature_c);
+                }
+
+                if (self->pn532_ != nullptr) {
+                    HiYaKaNfcTag tag{};
+                    const HiYaKaNfcPollResult result =
+                        self->pn532_->PollIso14443A(&tag, 1000);
+                    if (result == HiYaKaNfcPollResult::kFound) {
+                        ESP_LOGI(TAG,
+                                 "BRINGUP NFC: result=found targets=%u uid_length=%u fingerprint=%08" PRIx32 " ATQA=%04X SAK=%02X",
+                                 tag.target_count, tag.uid_length, NfcUidFingerprint(tag),
+                                 tag.atqa, tag.sak);
+                    } else {
+                        ESP_LOGI(TAG, "BRINGUP NFC: result=%s",
+                                 NfcPollResultName(result));
+                    }
+                    self->pn532_->SetRfOff();
+                }
+
+                ESP_LOGI(TAG,
+                         "BRINGUP READY: PWR_A pulses motor; ACT_B toggles microphone WAV and red lights");
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_diag", 6144, this, 4, nullptr);
+        if (created != pdPASS) {
+            ESP_LOGE(TAG, "failed to start bounded bring-up diagnostics");
+        }
+    }
+#endif
+
 public:
     HiYaKaBoard() {
+        ForcePaDisabled();
         LogPlatformBaseline();
         InitializeI2c();
-        InitializePca9557SafeState();
+#if !CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
         ProbeExpectedI2cDevices();
+#else
+        ESP_LOGI(TAG, "audio A/B: startup address scans skipped");
+#endif
+        InitializePca9557SafeState();
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS && !CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
+        ScanI2cBusForDiagnostics();
+#endif
 #if CONFIG_HI_YAKA_ENABLE_DISPLAY
         InitializeDisplay();
 #endif
@@ -354,6 +921,12 @@ public:
 #endif
 #if CONFIG_HI_YAKA_ENABLE_STORAGE
         InitializeStorage();
+#endif
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        InitializeAuxiliarySensors();
+#endif
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        StartBringupDiagnostics();
 #endif
         ESP_LOGW(TAG,
                  "pre-board candidate: enabled modules are L0 only until physical-board verification");
@@ -418,12 +991,14 @@ public:
                 return recording_port_ != nullptr;
             case hi_yaka::CapabilityId::kNetwork:
                 return true;
+            case hi_yaka::CapabilityId::kNfc:
+                return pn532_ != nullptr && pn532_->ready();
+            case hi_yaka::CapabilityId::kImu:
+                return qmi8658a_ != nullptr && qmi8658a_->ready();
             case hi_yaka::CapabilityId::kFeedback:
                 return feedback_ != nullptr;
             case hi_yaka::CapabilityId::kPower:
                 return true;
-            case hi_yaka::CapabilityId::kNfc:
-            case hi_yaka::CapabilityId::kImu:
             case hi_yaka::CapabilityId::kUpdate:
             case hi_yaka::CapabilityId::kCount:
                 return false;
@@ -435,6 +1010,110 @@ public:
         if (input_ != nullptr) {
             input_->SetEnabled(enabled);
         }
+    }
+
+    bool BeginNfcScan() {
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        if (pn532_ == nullptr || !pn532_->ready()) {
+            return false;
+        }
+        bool expected = false;
+        if (!nfc_scan_running_.compare_exchange_strong(expected, true)) {
+            return false;
+        }
+        nfc_scan_cancelled_.store(false);
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                bool found = false;
+                HiYaKaNfcTag tag{};
+                HiYaKaNfcPollResult result = HiYaKaNfcPollResult::kNoTarget;
+                const int64_t deadline_us = esp_timer_get_time() + 10LL * 1000 * 1000;
+                while (!self->nfc_scan_cancelled_.load() &&
+                       esp_timer_get_time() < deadline_us) {
+                    result = self->pn532_->PollIso14443A(&tag, 250);
+                    if (result == HiYaKaNfcPollResult::kFound) {
+                        found = true;
+                        break;
+                    }
+                    if (result == HiYaKaNfcPollResult::kTransportError ||
+                        result == HiYaKaNfcPollResult::kProtocolError ||
+                        result == HiYaKaNfcPollResult::kNoMemory) {
+                        break;
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                }
+                self->pn532_->SetRfOff();
+                const bool cancelled = self->nfc_scan_cancelled_.load();
+                if (found) {
+                    ESP_LOGI(TAG,
+                             "NFC tag: targets=%u uid_length=%u fingerprint=%08" PRIx32 " ATQA=%04X SAK=%02X",
+                             tag.target_count, tag.uid_length, NfcUidFingerprint(tag),
+                             tag.atqa, tag.sak);
+                } else {
+                    ESP_LOGI(TAG, "NFC scan ended: result=%s cancelled=%d",
+                             NfcPollResultName(result), cancelled);
+                }
+                self->nfc_scan_running_.store(false);
+                if (!cancelled) {
+                    Application::GetInstance().Schedule([found]() {
+                        hi_yaka::RuntimeAdapter::Get().OnNfcScanCompleted(found);
+                    });
+                }
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_nfc", 6144, this, 4, nullptr);
+        if (created != pdPASS) {
+            nfc_scan_running_.store(false);
+            return false;
+        }
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    void CancelNfcScan() { nfc_scan_cancelled_.store(true); }
+
+    void SetImuMonitoring(bool enabled) {
+#if CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS
+        imu_monitoring_.store(enabled);
+        if (!enabled || qmi8658a_ == nullptr || !qmi8658a_->ready()) {
+            return;
+        }
+        bool expected = false;
+        if (!imu_task_running_.compare_exchange_strong(expected, true)) {
+            return;
+        }
+        const BaseType_t created = xTaskCreate(
+            [](void* context) {
+                auto* self = static_cast<HiYaKaBoard*>(context);
+                unsigned sample_index = 0;
+                while (self->imu_monitoring_.load()) {
+                    HiYaKaImuSample sample{};
+                    const esp_err_t result = self->qmi8658a_->ReadSample(&sample, 100);
+                    if (result != ESP_OK) {
+                        ESP_LOGW(TAG, "IMU monitor read failed: %s", esp_err_to_name(result));
+                    } else if ((sample_index++ % 10) == 0) {
+                        ESP_LOGI(TAG,
+                                 "IMU monitor: accel_g=[%.3f %.3f %.3f] gyro_dps=[%.2f %.2f %.2f]",
+                                 sample.acceleration_g[0], sample.acceleration_g[1],
+                                 sample.acceleration_g[2], sample.angular_rate_dps[0],
+                                 sample.angular_rate_dps[1], sample.angular_rate_dps[2]);
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                }
+                self->imu_task_running_.store(false);
+                vTaskDelete(nullptr);
+            },
+            "hi_yaka_imu", 4096, this, 3, nullptr);
+        if (created != pdPASS) {
+            imu_task_running_.store(false);
+            imu_monitoring_.store(false);
+        }
+#else
+        (void)enabled;
+#endif
     }
 
     hi_yaka::RecordingStoragePortAdapter* RecordingPort() {
@@ -466,6 +1145,18 @@ bool BoardCapabilityReady(CapabilityId capability) {
 
 void SetBoardInputEnabled(bool enabled) {
     static_cast<HiYaKaBoard&>(Board::GetInstance()).SetInputEnabled(enabled);
+}
+
+bool BoardBeginNfcScan() {
+    return static_cast<HiYaKaBoard&>(Board::GetInstance()).BeginNfcScan();
+}
+
+void BoardCancelNfcScan() {
+    static_cast<HiYaKaBoard&>(Board::GetInstance()).CancelNfcScan();
+}
+
+void SetBoardImuMonitoring(bool enabled) {
+    static_cast<HiYaKaBoard&>(Board::GetInstance()).SetImuMonitoring(enabled);
 }
 
 RecordingStoragePortAdapter* BoardRecordingPort() {

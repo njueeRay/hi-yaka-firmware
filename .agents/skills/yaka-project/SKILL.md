@@ -23,6 +23,7 @@ description: 维护 HiYaKa 的产品、硬件、固件、验证证据及飞书�
 3. 新命名按表示法固定：可读/驼峰形式用 `HiYaKa`；全小写短横线形式用 `hi-yaka`；全大写下划线形式用 `HI_YAKA`。除此之外不新增其他变体。
 4. 代码与构建链统一使用：目录和 build ID 为 `chatchat/hi-yaka` / `hi-yaka`，类名为 `HiYaKaBoard`，宏为 `BOARD_TYPE_HI_YAKA`，文件名为 `hi_yaka_board.cc`。日志、测试、CI、图表和文档必须与这组标识一致。
 5. 审计命名时同时检查内容和路径；不得仅修改标题而保留带代际后缀的目录、文件、类、宏、构建产物或日志字段。
+6. Windows 本地机只用于 USB/串口、烧录、实板调试和日志采集；不得在 Windows 上编译固件或运行全仓测试。ESP-IDF 构建、host tests、合同检查和候选产物统一在 `aliyun_raynode` 或 GitHub Actions 的 Linux 环境执行并回读。
 
 ## 不可破坏的边界
 

@@ -1,10 +1,10 @@
 # HiYaKa 固件总体架构与开发基线
 
-> 文档状态：`评审基线 v1.5`
-> 最近更新：2026-11-02
+> 文档状态：`评审基线 v1.6`
+> 最近更新：2026-11-04
 > 适用硬件：ChatChat HiYaKa / ESP32-C6
 > 适用软件基线：`xiaozhi-esp32 v2.5.2`、ESP-IDF `v6.1`  
-> 当前实现阶段：PH0–PH5 已完成；M1 安全基线与 M2–M5 实板前适配已就绪，实板验证尚未开始
+> 当前实现阶段：PH0–PH5 已完成；M2–M6 软件 L0 已就绪；实板曾发现 U11/BOOST P0，当前开发样机拆除 L7 后等待受控恢复非功放 M1
 
 本文回答后续开发中最容易混淆的五个问题：产品究竟要完成什么、现有硬件实际能做什么、小智上游哪些能力可以直接复用、HiYaKa 必须自行开发什么，以及代码应按什么边界演进。
 
@@ -25,7 +25,7 @@ PRD 与硬件审计原文保存在 HiYaKa 项目资料区，不复制进固件�
 
 ### 0.2 架构图与阅读顺序
 
-详细架构图不是把“计划”伪装成“现状”，因此所有节点都带状态语义：蓝色为当前复用的小智代码，绿色为已经存在的 HiYaKa 实现，橙色虚线为尚待实现的目标，红色为约束或验证门禁。v1.5 已把 M2–M5 的实板前 L0 适配改为绿色；这只表示源码存在并接受编译门禁，不表示真实外设已经通过。
+详细架构图不是把“计划”伪装成“现状”，因此所有节点都带状态语义：蓝色为当前复用的小智代码，绿色为已经存在的 HiYaKa 实现，橙色虚线为尚待实现的目标，红色为约束或验证门禁。v1.6 已纳入 PN532/QMI8658A、数字音频 WAV、L7 隔离及 `aliyun_raynode` 统一命名；绿色只表示源码存在并接受编译门禁，不表示真实外设已经通过。
 
 | 页 | 主题 | 应回答的问题 | 可编辑源与预览 |
 |---:|---|---|---|
@@ -34,7 +34,7 @@ PRD 与硬件审计原文保存在 HiYaKa 项目资料区，不复制进固件�
 | 3 | 音频、录音、UI 与 OTA 数据流 | 数据经过哪些现存模块，HiYaKa 应在哪个接缝扩展 | [PNG](diagrams/yaka-firmware-architecture-page-3.drawio.png) |
 | 4 | 构建、上游、CI 与文档同步 | 板型如何被构建、上游如何合并、证据和文档如何闭环 | [PNG](diagrams/yaka-firmware-architecture-page-4.drawio.png) |
 
-多页审阅和归档使用[可检索 PDF（v1.5）](diagrams/yaka-firmware-architecture-v1.5.pdf)。`.drawio` 是唯一图形编辑源；PNG/PDF 是同一源文件的导出物，不能分别修改。旧版 PDF 只作历史导出保留。
+多页审阅和归档使用[可检索 PDF（v1.6）](diagrams/yaka-firmware-architecture-v1.6.pdf)。`.drawio` 是唯一图形编辑源；PNG/PDF 是同一源文件的导出物，不能分别修改。旧版 PDF 只作历史导出保留。
 
 ### 0.3 HiYaKa 命名合同
 
@@ -86,7 +86,7 @@ MVP 还必须形成配网、离线降级、文件管理、NFC 只读业务、用
 | 本地存储 | TF / SDSPI，无 card-detect | GPIO18 MOSI、19 CLK、20 MISO、15 CS；通过挂载结果判断卡状态 |
 | 共享 I²C | GPIO10 SDA、GPIO11 SCL，首板 100 kHz | 五个固定地址无冲突；每个设备必须有超时和故障隔离 |
 | NFC | PN532，I²C，首发只读，无 IRQ、无可控独立复位 | 采用有超时的轮询；失败不能阻塞首页或录音 |
-| IMU | QMI8658A，I²C 0x6A，无 IRQ | 当前只能轮询，不承诺深睡手势唤醒 |
+| IMU | QMI8658A，I²C 0x6B，无 IRQ | 当前只能轮询，不承诺深睡手势唤醒 |
 | 输入 | DPAD ADC 梯 + ACT_A/ACT_B + PWR_A/PWR_B | ADC 阈值必须用实板标定；PWR_A/B 不能从 MASTER_SW 硬关断状态唤醒 |
 | 反馈 | 单颗 RGB、五灯链、3 V ERM 振动 | 上电默认全灭/马达关闭；限制 RGB 总亮度 |
 | 电源 | MASTER_SW 直接硬切整机电源 | 任意时刻掉电是真实场景，录音、FAT、NVS、OTA 都必须可恢复 |
@@ -100,7 +100,7 @@ MVP 还必须形成配网、离线降级、文件管理、NFC 只读业务、用
 | PCA9557 | `0x19` | LCD、马达等控制 |
 | PN532 | `0x24` | NFC 只读轮询 |
 | ES7210 | `0x41` | 双麦 ADC / 播放参考 |
-| QMI8658A | `0x6A` | IMU |
+| QMI8658A | `0x6B` | IMU |
 
 PCA9557 上电必须先写 Output Port=`0x40`，再写 Configuration=`0x38`，最后读回验证。顺序反转可能短暂点亮背光、驱动马达或误选 LCD。M1 将 IO3/IO4/IO5 保持输入，其中 IO4 涉及历史 `PWR_EN` 链路，在重新确认产品语义前不主动驱动。
 
@@ -303,7 +303,7 @@ M1 的 16 MiB 分区结果为：NVS 16 KiB、OTA data 8 KiB、两个 4032 KiB ap
 
 产品开发固定在明确的小智 release/tag 上，不追随上游 `main`。上游升级使用独立 PR 和 merge commit；功能 PR 默认 squash。同步 PR 不混入新产品功能，并至少构建 HiYaKa C6 板型和一个上游 C6 代表板型。详细流程见仓库根目录 `UPSTREAM.md`。
 
-Raynode 正式工作区为 `/srv/projects/hi-yaka-firmware`，使用固定 `espressif/idf:v6.1` 镜像。仓库级 deploy key 允许该服务器直接拉取和推送本仓库，但不授予账户其他仓库权限。
+`aliyun_raynode` 正式工作区为 `/srv/projects/hi-yaka-firmware`，使用固定 `espressif/idf:v6.1` 镜像。仓库级 deploy key 允许该服务器直接拉取和推送本仓库，但不授予账户其他仓库权限。
 
 ## 11. 分阶段实现建议
 
@@ -336,4 +336,6 @@ Raynode 正式工作区为 `/srv/projects/hi-yaka-firmware`，使用固定 `espr
 
 ## 13. 当前状态
 
-截至 2026-11-02：PH0–PH5 已取得 L0 证据；PR #11 继续把 M2–M5 的确定性工作推进到真实板级适配。新增内容包括分模块安全开关、PCA9557 并发安全控制、LCD PARLIO panel IO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs、AudioService PCM 分流、独立录音写卡任务和 `RuntimeAdapter`。ESP32-C6 只有一个用户 SPI 控制器，因此资源合同固定为 TF 独占 SPI2、LCD 使用 PARLIO 候选路径。`hi-yaka` 仍是 M1 安全构建，`hi-yaka-lab` 只用于编译覆盖和逐项调试。真实硬件仍未连接，所有新增结论均为 L0；屏幕、电气、输入阈值、音频通道、TF/FAT 掉电安全、联网体验和 OTA 回滚仍无 L1/L2 证据。
+截至 2026-11-04：PH0–PH5 已取得 L0 证据；M2–M5 的确定性工作已推进到真实板级适配。实现包括分模块安全开关、PCA9557 并发安全控制、LCD PARLIO panel IO、ADC/GPIO 输入、电池、RGB/灯阵/马达、ES7210/ES8311、TF/FatFs、AudioService PCM 分流、独立录音写卡任务和 `RuntimeAdapter`。PN532 已具备有界 ISO14443A 只读轮询，QMI8658A 已具备约 112 Hz 六轴采样；实验室构建由板上 `ACT_B` 临时启停有界麦克风 WAV（红灯指示、单次最多 180 秒），首次解码输出也保存为标准 WAV（最多 30 秒）。`ACT_B` 属于 ADC 梯，内部 `KEYB` 网实际对应板上 `PWR_B`。ESP32-C6 只有一个用户 SPI 控制器，因此资源合同固定为 TF 独占 SPI2、LCD 使用 PARLIO 候选路径。
+
+实板已发现并复现 U11/BOOST P0 失效链；当前开发样机拆除 L7 后不再快速升温，但功放根因和下一版 ECO 尚未关闭。`hi-yaka` 仍是 M1 安全构建，`hi-yaka-lab` 只用于操作者在场时的受控逐项调试。除 L7 隔离后的现场温升观察外，屏幕、输入阈值、音频通道、TF/FAT、NFC、IMU、联网体验和 OTA 回滚仍缺少完整 L1/L2 证据。

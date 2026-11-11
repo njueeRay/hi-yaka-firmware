@@ -21,12 +21,21 @@
 #define YAKA_PCA9557_I2C_ADDRESS 0x19
 #define YAKA_PN532_I2C_ADDRESS 0x24
 #define YAKA_ES7210_I2C_ADDRESS 0x41
-#define YAKA_QMI8658A_I2C_ADDRESS 0x6A
+// R90 straps SDO/SA0 to GND, selecting the QMI8658A 7-bit address 0x6B.
+#define YAKA_QMI8658A_I2C_ADDRESS 0x6B
+
+// esp_codec_dev retains the codec datasheet's 8-bit address convention and
+// shifts this value right before registering an IDF 7-bit I2C device. Keep
+// these values separate from the 7-bit addresses used by i2c_master_probe().
+#define YAKA_ES8311_CODEC_ADDRESS (YAKA_ES8311_I2C_ADDRESS << 1)
+#define YAKA_ES7210_CODEC_ADDRESS (YAKA_ES7210_I2C_ADDRESS << 1)
 
 // PCA9557 register contract. Configuration bit: 1=input, 0=output.
 // Outputs in M1: IO0 LCD_BL, IO1 LCD_RST, IO2 MOTOR_CTRL,
 // IO6 LCD_CS, IO7 LCD_DC. IO3/IO4/IO5 remain inputs.
-// Safe values: backlight off, LCD held in reset, motor off, LCD CS inactive.
+// IO0 is open-drain. This board omitted the LCD_BL pull-up, so releasing IO0
+// does not turn on the backlight; a hardware fix is required (see bring-up log).
+// Safe values: IO0 actively low, LCD held in reset, motor off, LCD CS inactive.
 #define YAKA_PCA9557_SAFE_OUTPUT 0x40
 #define YAKA_PCA9557_SAFE_CONFIGURATION 0x38
 
@@ -45,6 +54,13 @@
 #define YAKA_LCD_PIXEL_CLOCK_HZ (10 * 1000 * 1000)
 #define YAKA_LCD_WIDTH 200
 #define YAKA_LCD_HEIGHT 320
+// The glass is mounted with its 320-pixel side horizontal on HiYaKa.
+#define YAKA_LCD_VIEW_WIDTH YAKA_LCD_HEIGHT
+#define YAKA_LCD_VIEW_HEIGHT YAKA_LCD_WIDTH
+// ST7789 has 240 columns of RAM while this glass exposes 200. The centered
+// 20-pixel offset removed the visible edge noise on the current panel.
+#define YAKA_LCD_VIEW_GAP_X 0
+#define YAKA_LCD_VIEW_GAP_Y 20
 #define YAKA_LCD_OFFSET_X 0
 #define YAKA_LCD_OFFSET_Y 0
 

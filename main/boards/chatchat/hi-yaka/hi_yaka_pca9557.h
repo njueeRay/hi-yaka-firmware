@@ -16,6 +16,7 @@ public:
     esp_err_t SetOutputBit(uint8_t bit, bool high);
     esp_err_t SetLcdControl(bool selected, bool data_mode);
     esp_err_t ReadBack(uint8_t* output, uint8_t* configuration);
+    esp_err_t ReadPinLevels(uint8_t* levels);
 
     bool ready() const { return ready_; }
     uint8_t output_shadow() const { return output_shadow_; }

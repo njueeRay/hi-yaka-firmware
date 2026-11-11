@@ -14,8 +14,9 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertEqual(config["manufacturer"], "chatchat")
         self.assertEqual(config["type"], "hi-yaka")
         self.assertEqual(config["target"], "esp32c6")
-        self.assertEqual(len(config["builds"]), 2)
-        build = config["builds"][0]
+        builds = {build["name"]: build for build in config["builds"]}
+        self.assertEqual(len(builds), len(config["builds"]))
+        build = builds["hi-yaka"]
         self.assertEqual(build["name"], "hi-yaka")
         options = set(build["sdkconfig_append"])
         self.assertFalse(any(option.startswith("CONFIG_SPIRAM=") for option in options))
@@ -24,11 +25,48 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertNotIn("CONFIG_USE_DEVICE_AEC=y", options)
         self.assertFalse(any(option.startswith("CONFIG_HI_YAKA_ENABLE_") for option in options))
 
-        lab_build = config["builds"][1]
+        lab_build = builds["hi-yaka-lab"]
         self.assertEqual(lab_build["name"], "hi-yaka-lab")
         lab_options = set(lab_build["sdkconfig_append"])
         self.assertIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", lab_options)
         self.assertIn("CONFIG_HI_YAKA_ENABLE_STORAGE=y", lab_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", lab_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", lab_options)
+        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME=y", lab_options)
+
+        parlio_options = set(builds["hi-yaka-lab-lcd-parlio"]["sdkconfig_append"])
+        gpio_options = set(builds["hi-yaka-lab-lcd-gpio"]["sdkconfig_append"])
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", parlio_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", parlio_options)
+        self.assertEqual(
+            gpio_options - parlio_options,
+            {"CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC=y"},
+        )
+        self.assertFalse(parlio_options - gpio_options)
+
+        headless_build = builds["hi-yaka-lab-headless"]
+        self.assertEqual(headless_build["name"], "hi-yaka-lab-headless")
+        headless_options = set(headless_build["sdkconfig_append"])
+        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_INPUT=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_FEEDBACK=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y", headless_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", headless_options)
+
+        baseline_build = builds["hi-yaka-lab-audio-baseline"]
+        self.assertEqual(baseline_build["name"], "hi-yaka-lab-audio-baseline")
+        baseline_options = set(baseline_build["sdkconfig_append"])
+        self.assertIn("CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS=y", baseline_options)
+        self.assertNotIn("CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS=y", baseline_options)
+
+        audio_ab_build = builds["hi-yaka-lab-audio-ab"]
+        self.assertEqual(audio_ab_build["name"], "hi-yaka-lab-audio-ab")
+        audio_ab_options = set(audio_ab_build["sdkconfig_append"])
+        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_DISPLAY=y", audio_ab_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", audio_ab_options)
+        self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", audio_ab_options)
+        self.assertIn("CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS=y", audio_ab_options)
 
     def test_build_selection_chain_is_complete(self):
         kconfig = (ROOT / "main" / "Kconfig.projbuild").read_text(encoding="utf-8")
@@ -44,11 +82,18 @@ class HiYaKaBoardContractTest(unittest.TestCase):
             "YAKA_I2C_SDA_GPIO": "GPIO_NUM_10",
             "YAKA_I2C_SCL_GPIO": "GPIO_NUM_11",
             "YAKA_PCA9557_I2C_ADDRESS": "0x19",
+            "YAKA_QMI8658A_I2C_ADDRESS": "0x6B",
             "YAKA_PCA9557_SAFE_OUTPUT": "0x40",
             "YAKA_PCA9557_SAFE_CONFIGURATION": "0x38",
         }
         for name, value in expected.items():
             self.assertRegex(header, rf"#define\s+{name}\s+{re.escape(value)}")
+        self.assertIn(
+            "YAKA_ES8311_CODEC_ADDRESS (YAKA_ES8311_I2C_ADDRESS << 1)", header
+        )
+        self.assertIn(
+            "YAKA_ES7210_CODEC_ADDRESS (YAKA_ES7210_I2C_ADDRESS << 1)", header
+        )
 
     def test_pca9557_safe_write_precedes_direction_change(self):
         source = (BOARD_DIR / "hi_yaka_pca9557.cc").read_text(encoding="utf-8")
@@ -82,13 +127,39 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_IDF_TARGET_ESP32C6", source)
         self.assertIn("defined(CONFIG_SPIRAM) && CONFIG_SPIRAM", source)
         self.assertIn("DummyAudioCodec", source)
+        self.assertIn("PA safety interlock active", source)
+        self.assertIn(
+            "ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false", source
+        )
+        self.assertIn("YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS", source)
 
     def test_lcd_does_not_consume_the_only_user_spi_controller(self):
         lcd_io = (BOARD_DIR / "hi_yaka_expander_lcd_io.cc").read_text(encoding="utf-8")
         self.assertIn("parlio_new_tx_unit", lcd_io)
         self.assertNotIn("spi_bus_initialize", lcd_io)
         self.assertNotIn("spi_bus_add_device", lcd_io)
+        self.assertIn("tx_config.data_width = 4", lcd_io)
+        self.assertIn("chunk_size * 32", lcd_io)
+        self.assertIn("EncodeSerialBytes", lcd_io)
+        self.assertIn("return result;", lcd_io)
+        self.assertIn("lcd_cmd == LCD_CMD_CASET", lcd_io)
+        self.assertIn("release_failed_flush", lcd_io)
+        self.assertIn("NotifyColorDone(context);", lcd_io)
+        self.assertLess(
+            lcd_io.index("NotifyColorDone(context);", lcd_io.index("esp_err_t TxColor")),
+            lcd_io.index("return result;", lcd_io.index("esp_err_t TxColor")),
+        )
+        self.assertNotIn("size * 8, &transmit_config", lcd_io)
         self.assertIn("YAKA_TF_SCLK_GPIO GPIO_NUM_19", (BOARD_DIR / "config.h").read_text(encoding="utf-8"))
+
+    def test_pca9557_retries_transient_control_write_failures(self):
+        source = (BOARD_DIR / "hi_yaka_pca9557.cc").read_text(encoding="utf-8")
+        self.assertIn("kRegisterWriteAttempts = 3", source)
+        self.assertIn("attempt <= kRegisterWriteAttempts", source)
+        self.assertIn("i2c_master_transmit(device_, data, sizeof(data), 100)", source)
+        self.assertIn('"register 0x%02X write exhausted', source)
+        self.assertIn("gpio_get_level(YAKA_I2C_SDA_GPIO)", source)
+        self.assertIn("gpio_get_level(YAKA_I2C_SCL_GPIO)", source)
 
     def test_recording_commit_is_rejected_after_loss_or_write_failure(self):
         runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(
@@ -98,6 +169,74 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("recording_fault_.store(true)", runtime)
         self.assertIn("dropped_blocks_.load() != 0", runtime)
         self.assertIn("port->AbortRecording()", runtime)
+
+    def test_auxiliary_drivers_are_real_and_bounded(self):
+        config = json.loads((BOARD_DIR / "config.json").read_text(encoding="utf-8"))
+        lab_options = set(config["builds"][1]["sdkconfig_append"])
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_AUXILIARY_SENSORS=y", lab_options)
+
+        manifest = (ROOT / "main" / "idf_component.yml").read_text(encoding="utf-8")
+        self.assertIn("jef-sure/pn532: ==0.8.2", manifest)
+
+        pn532 = (BOARD_DIR / "hi_yaka_pn532.cc").read_text(encoding="utf-8")
+        self.assertIn("pn532_i2c_attach", pn532)
+        self.assertIn("pn532_14443_get_all_uids_ex", pn532)
+        self.assertIn("pn532_set_rf_off", pn532)
+        self.assertIn("GPIO_NUM_NC, GPIO_NUM_NC", pn532)
+
+        imu = (BOARD_DIR / "hi_yaka_qmi8658a.cc").read_text(encoding="utf-8")
+        self.assertIn("kExpectedWhoAmI = 0x05", imu)
+        self.assertIn("kResetCommand = 0xB0", imu)
+        self.assertIn("kAccel4g112Hz = 0x16", imu)
+        self.assertIn("kGyro512dps112Hz = 0x56", imu)
+        self.assertIn("ESP_ERR_TIMEOUT", imu)
+
+        runtime = (ROOT / "main" / "yaka" / "runtime_adapter.cc").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("BoardBeginNfcScan()", runtime)
+        self.assertIn("SetBoardImuMonitoring(enabled)", runtime)
+
+    def test_lab_audio_diagnostics_are_bounded_and_replayable(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        feedback = (BOARD_DIR / "hi_yaka_feedback.cc").read_text(encoding="utf-8")
+        writer = (BOARD_DIR / "hi_yaka_wav_writer.cc").read_text(encoding="utf-8")
+        self.assertIn("act-b-%03lu.wav", board)
+        self.assertIn("PhysicalKey::kBack", board)
+        self.assertIn("lab_record_stop_requested_.store(true)", board)
+        self.assertIn("kMaximumSeconds = 180", board)
+        self.assertIn("SetLabRecordingIndicator(true)", board)
+        self.assertIn("SetLabRecordingIndicator(false)", board)
+        self.assertIn("lab_recording_indicator_override_", feedback)
+        self.assertIn("decoded-output.wav", board)
+        self.assertIn("kMaximumSeconds = 30", board)
+        self.assertIn('std::memcpy(header, "RIFF", 4)', writer)
+        self.assertIn('std::memcpy(header + 8, "WAVEfmt ", 8)', writer)
+        self.assertIn('std::memcpy(header + 36, "data", 4)', writer)
+        self.assertIn("fsync(fileno(file_))", writer)
+
+    def test_lab_diagnostics_expose_repeatable_motor_and_full_i2c_scan(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        self.assertIn('"BRINGUP key: name=%s gesture=%s"', board)
+        self.assertIn('"BRINGUP motor: PWR_A -> warning pulse 80 ms"', board)
+        self.assertIn("FeedbackSignal::kWarning", board)
+        input_source = (BOARD_DIR / "hi_yaka_input.cc").read_text(encoding="utf-8")
+        self.assertIn('"BRINGUP input raw: ladder=%d mV decoded=%d key_a=%d key_b=%d"', input_source)
+        self.assertIn('"BRINGUP I2C scan found: 0x%02X"', board)
+        self.assertIn("address = 0x08; address <= 0x77", board)
+
+    def test_pn532_initialization_is_not_gated_by_address_probe(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        auxiliary = board[board.index("void InitializeAuxiliarySensors()") :]
+        pn532_section = auxiliary[auxiliary.index("pn532_ =") : auxiliary.index("#endif")]
+        self.assertNotIn("i2c_master_probe", pn532_section)
+        self.assertIn("pn532_->Initialize()", pn532_section)
+
+    def test_display_restores_backlight_after_panel_init(self):
+        board = (BOARD_DIR / "hi_yaka_board.cc").read_text(encoding="utf-8")
+        create_panel = board.index("esp_lcd_new_panel_st7789")
+        restore_backlight = board.index("backlight_->RestoreBrightness()")
+        self.assertLess(create_panel, restore_backlight)
 
 
 if __name__ == "__main__":
