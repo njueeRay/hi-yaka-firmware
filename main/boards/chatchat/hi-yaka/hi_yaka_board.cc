@@ -314,16 +314,20 @@ private:
     }
 
     void InitializePca9557SafeState() {
-        esp_err_t probe_result =
-            i2c_master_probe(i2c_bus_, YAKA_PCA9557_I2C_ADDRESS, 100);
-        if (probe_result != ESP_OK) {
-            ESP_LOGE(TAG, "PCA9557 probe failed at 0x%02X: %s",
-                     YAKA_PCA9557_I2C_ADDRESS, esp_err_to_name(probe_result));
-            return;
-        }
-
         pca9557_ = std::make_unique<HiYaKaPca9557>(i2c_bus_);
-        esp_err_t result = pca9557_->InitializeSafe();
+        esp_err_t result = ESP_FAIL;
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            result = pca9557_->InitializeSafe();
+            if (result == ESP_OK) {
+                if (attempt > 0) {
+                    ESP_LOGW(TAG, "PCA9557 safe state recovered on attempt %d", attempt + 1);
+                }
+                break;
+            }
+            if (attempt < 4) {
+                vTaskDelay(pdMS_TO_TICKS(25));
+            }
+        }
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "PCA9557 safe initialization failed: %s", esp_err_to_name(result));
             pca9557_.reset();
@@ -333,8 +337,7 @@ private:
         uint8_t output = 0;
         uint8_t configuration = 0;
         esp_err_t readback_result = pca9557_->ReadBack(&output, &configuration);
-        if (readback_result == ESP_OK &&
-            output == YAKA_PCA9557_SAFE_OUTPUT &&
+        if (readback_result == ESP_OK && output == YAKA_PCA9557_SAFE_OUTPUT &&
             configuration == YAKA_PCA9557_SAFE_CONFIGURATION) {
             ESP_LOGI(TAG, "PCA9557 safe state verified: output=0x%02X config=0x%02X", output,
                      configuration);
@@ -881,8 +884,8 @@ public:
         ForcePaDisabled();
         LogPlatformBaseline();
         InitializeI2c();
-        InitializePca9557SafeState();
         ProbeExpectedI2cDevices();
+        InitializePca9557SafeState();
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
         ScanI2cBusForDiagnostics();
 #endif
