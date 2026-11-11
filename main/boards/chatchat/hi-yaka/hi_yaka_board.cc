@@ -895,9 +895,13 @@ public:
         ForcePaDisabled();
         LogPlatformBaseline();
         InitializeI2c();
+#if !CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
         ProbeExpectedI2cDevices();
+#else
+        ESP_LOGI(TAG, "audio A/B: startup address scans skipped");
+#endif
         InitializePca9557SafeState();
-#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS && !CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
         ScanI2cBusForDiagnostics();
 #endif
 #if CONFIG_HI_YAKA_ENABLE_DISPLAY
