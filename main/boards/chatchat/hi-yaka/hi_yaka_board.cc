@@ -395,6 +395,16 @@ private:
             result = esp_lcd_panel_init(panel);
         }
         if (result == ESP_OK) {
+            result = esp_lcd_panel_swap_xy(panel, true);
+        }
+        if (result == ESP_OK) {
+            result = esp_lcd_panel_mirror(panel, true, false);
+        }
+        if (result == ESP_OK) {
+            result = esp_lcd_panel_set_gap(
+                panel, YAKA_LCD_VIEW_GAP_X, YAKA_LCD_VIEW_GAP_Y);
+        }
+        if (result == ESP_OK) {
             // esp_lcd_panel_init() leaves ST7789 display output disabled.
             // Enable it before the visual color probe; otherwise successful
             // RAM writes cannot be interpreted as a visible-panel test.
@@ -418,7 +428,7 @@ private:
         constexpr std::array<const char*, 5> kColorNames = {
             "red", "green", "blue", "white", "black"};
         auto* test_pixels = static_cast<uint16_t*>(heap_caps_malloc(
-            YAKA_LCD_WIDTH * kRowsPerTransfer * sizeof(uint16_t),
+            YAKA_LCD_VIEW_WIDTH * kRowsPerTransfer * sizeof(uint16_t),
             MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
         if (test_pixels != nullptr) {
             const esp_err_t light_result =
@@ -427,15 +437,15 @@ private:
                      esp_err_to_name(light_result));
             for (size_t color_index = 0; color_index < kTestColors.size();
                  ++color_index) {
-                std::fill_n(test_pixels, YAKA_LCD_WIDTH * kRowsPerTransfer,
+                std::fill_n(test_pixels, YAKA_LCD_VIEW_WIDTH * kRowsPerTransfer,
                             kTestColors[color_index]);
                 esp_err_t draw_result = ESP_OK;
-                for (int y = 0; y < YAKA_LCD_HEIGHT;
+                for (int y = 0; y < YAKA_LCD_VIEW_HEIGHT;
                      y += static_cast<int>(kRowsPerTransfer)) {
                     draw_result = esp_lcd_panel_draw_bitmap(
-                        panel, 0, y, YAKA_LCD_WIDTH,
+                        panel, 0, y, YAKA_LCD_VIEW_WIDTH,
                         std::min(y + static_cast<int>(kRowsPerTransfer),
-                                 YAKA_LCD_HEIGHT),
+                                 YAKA_LCD_VIEW_HEIGHT),
                         test_pixels);
                     if (draw_result != ESP_OK) {
                         break;
@@ -452,11 +462,11 @@ private:
         }
 #endif
 
-        // Geometry is frozen by the display module. Orientation, offsets,
-        // inversion and color order are deliberately provisional until L1.
+        // Landscape orientation and the centered RAM gap were visually checked
+        // on one board; repeated cold starts and refresh stability remain open.
         display_ = std::make_unique<SpiLcdDisplay>(
-            panel_io, panel, YAKA_LCD_WIDTH, YAKA_LCD_HEIGHT, YAKA_LCD_OFFSET_X,
-            YAKA_LCD_OFFSET_Y, false, false, false);
+            panel_io, panel, YAKA_LCD_VIEW_WIDTH, YAKA_LCD_VIEW_HEIGHT,
+            YAKA_LCD_OFFSET_X, YAKA_LCD_OFFSET_Y, true, false, true);
         backlight_ = std::make_unique<ExpanderBacklight>(*pca9557_);
         backlight_->RestoreBrightness();
         uint8_t output = 0;

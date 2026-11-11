@@ -54,6 +54,13 @@
 #define YAKA_LCD_PIXEL_CLOCK_HZ (10 * 1000 * 1000)
 #define YAKA_LCD_WIDTH 200
 #define YAKA_LCD_HEIGHT 320
+// The glass is mounted with its 320-pixel side horizontal on HiYaKa.
+#define YAKA_LCD_VIEW_WIDTH YAKA_LCD_HEIGHT
+#define YAKA_LCD_VIEW_HEIGHT YAKA_LCD_WIDTH
+// ST7789 has 240 columns of RAM while this glass exposes 200. The centered
+// 20-pixel offset removed the visible edge noise on the current panel.
+#define YAKA_LCD_VIEW_GAP_X 0
+#define YAKA_LCD_VIEW_GAP_Y 20
 #define YAKA_LCD_OFFSET_X 0
 #define YAKA_LCD_OFFSET_Y 0
 
