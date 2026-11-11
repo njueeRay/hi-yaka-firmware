@@ -538,6 +538,11 @@ private:
 
 #if CONFIG_HI_YAKA_ENABLE_AUDIO
     void InitializeAudio() {
+#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
+        // The input-only A/B probe must run before the paired-codec gate.
+        // An intermittent ES8311 ACK must not hide ES7210 receive evidence.
+        HiYaKaRunAudioAbDiagnostics(i2c_bus_);
+#endif
         const esp_err_t output_probe =
             i2c_master_probe(i2c_bus_, YAKA_ES8311_I2C_ADDRESS, 100);
         const esp_err_t input_probe =
@@ -547,10 +552,6 @@ private:
                      esp_err_to_name(output_probe), esp_err_to_name(input_probe));
             return;
         }
-
-#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
-        HiYaKaRunAudioAbDiagnostics(i2c_bus_);
-#endif
 
         // Lab builds isolate both physical microphones on a standard stereo
         // frame. This distinguishes a TDM/clock mismatch from a dead SDOUT1
