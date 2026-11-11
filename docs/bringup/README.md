@@ -21,6 +21,7 @@
 - [HIYAKA-LCD-INC-001 显示屏完全无背光](HIYAKA_LCD_BACKLIGHT_INCIDENT.md)：已定位的背光控制缺陷、返修路径与画面验收；
 - [HIYAKA-NFC-INC-001 PN532 无 I²C 应答](HIYAKA_NFC_NO_ACK_INCIDENT.md)：根因待定的分层测量与关闭条件；
 - [2026-11-05 NFC 主机接口 A/B 实板记录](2026-11-05-nfc-interface-ab-results.md)：旧版 HSU 与当前 I²C 对照、独立诊断镜像及原镜像恢复；
+- [2026-11-12 LCD 飞线后与全模块复测](2026-11-12-lcd-flywire-and-module-retest.md)：背光已亮、纯色画面未显示，以及同次外设证据；
 - [HIYAKA-AUDIO-INC-001 麦克风无有效数据专项问题](HIYAKA_MICROPHONE_DATA_PATH_INCIDENT.md)：现象、逐层排查、解决路径与关闭条件；
 - `scripts/hi_yaka_evidence.py`：生成、记录和校验样机证据包。
 

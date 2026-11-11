@@ -394,6 +394,49 @@ private:
             return;
         }
 
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        // Show unmistakable colors before LVGL can replace the panel contents.
+        // The panel has no readback path, so API success is only transport evidence.
+        constexpr size_t kRowsPerTransfer = 20;
+        constexpr std::array<uint16_t, 5> kTestColors = {
+            0xF800, 0x07E0, 0x001F, 0xFFFF, 0x0000};
+        constexpr std::array<const char*, 5> kColorNames = {
+            "red", "green", "blue", "white", "black"};
+        auto* test_pixels = static_cast<uint16_t*>(heap_caps_malloc(
+            YAKA_LCD_WIDTH * kRowsPerTransfer * sizeof(uint16_t),
+            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        if (test_pixels != nullptr) {
+            const esp_err_t light_result =
+                pca9557_->SetOutputBit(YAKA_PCA9557_LCD_BL_BIT, true);
+            ESP_LOGI(TAG, "LCD color test backlight=%s",
+                     esp_err_to_name(light_result));
+            for (size_t color_index = 0; color_index < kTestColors.size();
+                 ++color_index) {
+                std::fill_n(test_pixels, YAKA_LCD_WIDTH * kRowsPerTransfer,
+                            kTestColors[color_index]);
+                esp_err_t draw_result = ESP_OK;
+                for (int y = 0; y < YAKA_LCD_HEIGHT;
+                     y += static_cast<int>(kRowsPerTransfer)) {
+                    draw_result = esp_lcd_panel_draw_bitmap(
+                        panel, 0, y, YAKA_LCD_WIDTH,
+                        std::min(y + static_cast<int>(kRowsPerTransfer),
+                                 YAKA_LCD_HEIGHT),
+                        test_pixels);
+                    if (draw_result != ESP_OK) {
+                        break;
+                    }
+                }
+                ESP_LOGI(TAG, "LCD color test %s: %s",
+                         kColorNames[color_index],
+                         esp_err_to_name(draw_result));
+                vTaskDelay(pdMS_TO_TICKS(1500));
+            }
+            free(test_pixels);
+        } else {
+            ESP_LOGE(TAG, "LCD color test skipped: no internal buffer");
+        }
+#endif
+
         // Geometry is frozen by the display module. Orientation, offsets,
         // inversion and color order are deliberately provisional until L1.
         display_ = std::make_unique<SpiLcdDisplay>(
