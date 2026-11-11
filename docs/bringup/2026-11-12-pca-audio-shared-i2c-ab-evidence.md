@@ -41,7 +41,7 @@
 
 暂停重复烧录音频镜像。下一步先让共享 I²C 的硬件条件可判定：在完全断电后将 PN532 的 SET0/SET1 固定为设计所需的确定电平，并复核 R8/A0 的上拉焊接、A0 对地电压与 `0x18/0x19` 地址身份。复测时先要求 PCA9557 与 ES7210 的寄存器连续读写稳定，再讨论 PCM；若成功进入接收，记录 ES7210 `0x0B`、原始 PCM、GPIO13 弱拉/边沿。状态正常而 GPIO13 无边沿时，再由维修台测 U12.11、R65 两侧及芯片脚电源/时钟。LCD 需要持续运行和无重试/无像素发送错误，不能以单次横屏显示关闭稳定性问题。
 
-实验结束后已烧回此前由用户目视确认横屏正常的 GPIO 显示镜像（SHA-256 `4D436FF4867AD641ECE6ACCAFD642F719561378E76FFE1C9EC5CC6823FFF287A`），设备端写入哈希校验通过。恢复后 40 秒日志确认 `hi-yaka-lab-lcd-gpio` 启动一次、五次纯色 API 完成；同时仍有 305 条 PCA9557 写重试、13 次重试耗尽和 12 次 LCD 像素发送失败。**镜像已恢复，但当前画面和持续稳定性不得由串口 API 成功代替目视验收。**
+实验结束后已烧回此前由用户目视确认横屏正常的 GPIO 显示镜像（SHA-256 `4D436FF4867AD641ECE6ACCAFD642F719561378E76FFE1C9EC5CC6823FFF287A`），设备端写入哈希校验通过。首次恢复的 40 秒日志确认 `hi-yaka-lab-lcd-gpio` 启动一次、五次纯色 API 完成；同时有 305 条 PCA9557 写重试、13 次重试耗尽和 12 次 LCD 像素发送失败，用户目视为**仅有背光、无任何颜色或文字**。保持同一镜像、同一接线，仅再次复位，用户看到颜色或文字、温度正常；随后确认画面仍显示，文字沿长边横向排列、无雪花带。第二次 40 秒日志仍有 318 条重试、19 次耗尽和 15 次像素发送失败。这证明显示的当次成败具有间歇性，排除“镜像未写入”为首次黑屏的解释；并不证明 PCA9557 是唯一硬件根因。**当前 LCD 稳定性仍为 FAIL。**
 
 ## 证据索引
 
@@ -55,6 +55,7 @@
 | `audio-ab-5fa5b35-current-board-20261112.log` | `18928EE62ACB48B76E439443D4FB9EDD9D0FCEF5B8142B0AA664ACBA3B4BAFEE` |
 | `audio-ab-no-scan-b1594ad-current-board-20261112.log` | `0D3A5D73B11D321C9E80EEC80E541451F8AE9CC376B0D443B3AAF4CA92836A9D` |
 | `lcd-restored-boot-20261112.log` | `61BEA7D189E30032299F31938598CCE4E27ECCF837B62051472BC0498D079D06` |
+| `lcd-retry-after-visual-fail-20261112.log` | `A84A71205664BBD5F5936AEE2988043C3941AB29FBB4258215E8D390DAE48EB2` |
 | `lab-audio-ab/serial-baseline-25s.log` | `D31947C21F7CB9C5B480468BFB7E2097018508FFEAE1170FFA89EBA70EC0B757` |
 
 资料：冻结原理图/PCB 与当前 EDA 网表；[NXP PCA9557 数据手册](https://www.nxp.com/docs/en/data-sheet/PCA9557.pdf)；[Everest ES7210 数据手册](https://files.waveshare.com/wiki/common/ES7210_DS.pdf)；[ESP-IDF I²C 错误定义](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/i2c.html)。
