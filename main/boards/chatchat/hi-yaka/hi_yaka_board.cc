@@ -589,11 +589,17 @@ private:
             // slot makes esp_codec_dev reconfigure the RX interface to mono,
             // which hides whether MIC2 appears in the other physical slot.
             true, 24.0f, 1, 24.0f, YAKA_I2C_PORT,
-            ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true);
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true, true);
 #else
             true, 24.0f, 2, 0.0f, YAKA_I2C_PORT,
-            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false, false);
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false, false, true);
 #endif
+        if (!audio_codec_->ready()) {
+            ESP_LOGE(TAG, "audio codec initialization failed; audio disabled for this boot");
+            audio_codec_.reset();
+            ForcePaDisabled();
+            return;
+        }
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
 #if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS || CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS

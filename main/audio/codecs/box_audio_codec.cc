@@ -14,7 +14,16 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
                              uint8_t es7210_addr, bool input_reference, float input_gain,
                              int reference_gain_channel, float reference_gain,
                              i2c_port_t i2c_port, uint32_t es7210_mic_mask,
-                             bool speaker_pa_enabled, bool std_stereo_input) {
+                             bool speaker_pa_enabled, bool std_stereo_input,
+                             bool graceful_init_failure) {
+    graceful_init_failure_ = graceful_init_failure;
+    auto fail = [this](const char* stage) {
+        ESP_LOGE(TAG, "initialization failed at %s; graceful=%d", stage,
+                 graceful_init_failure_);
+        if (!graceful_init_failure_) {
+            assert(false && "BoxAudioCodec initialization failed");
+        }
+    };
     duplex_ = true;                              // 是否双工
     input_reference_ = input_reference;          // 是否使用参考输入，实现回声消除
     input_channels_ = input_reference_ ? 2 : 1;  // 输入通道数
@@ -26,7 +35,10 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     speaker_pa_enabled_ = speaker_pa_enabled;
     std_stereo_input_ = std_stereo_input;
 
-    CreateDuplexChannels(mclk, bclk, ws, dout, din);
+    if (!CreateDuplexChannels(mclk, bclk, ws, dout, din)) {
+        fail("I2S duplex channels");
+        return;
+    }
 
     // Do initialize of related interface: data_if, ctrl_if and gpio_if
     audio_codec_i2s_cfg_t i2s_cfg = {
@@ -35,7 +47,10 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
         .tx_handle = tx_handle_,
     };
     data_if_ = audio_codec_new_i2s_data(&i2s_cfg);
-    assert(data_if_ != NULL);
+    if (data_if_ == nullptr) {
+        fail("I2S data interface");
+        return;
+    }
 
     // Output
     audio_codec_i2c_cfg_t i2c_cfg = {
@@ -44,10 +59,16 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
         .bus_handle = i2c_master_handle,
     };
     out_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
-    assert(out_ctrl_if_ != NULL);
+    if (out_ctrl_if_ == nullptr) {
+        fail("ES8311 I2C control interface");
+        return;
+    }
 
     gpio_if_ = audio_codec_new_gpio();
-    assert(gpio_if_ != NULL);
+    if (gpio_if_ == nullptr) {
+        fail("codec GPIO interface");
+        return;
+    }
 
     es8311_codec_cfg_t es8311_cfg = {};
     es8311_cfg.ctrl_if = out_ctrl_if_;
@@ -58,7 +79,10 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es8311_cfg.hw_gain.pa_voltage = 5.0;
     es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
     out_codec_if_ = es8311_codec_new(&es8311_cfg);
-    assert(out_codec_if_ != NULL);
+    if (out_codec_if_ == nullptr) {
+        fail("ES8311 codec open");
+        return;
+    }
 
     esp_codec_dev_cfg_t dev_cfg = {
         .dev_type = ESP_CODEC_DEV_TYPE_OUT,
@@ -66,44 +90,95 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
         .data_if = data_if_,
     };
     output_dev_ = esp_codec_dev_new(&dev_cfg);
-    assert(output_dev_ != NULL);
+    if (output_dev_ == nullptr) {
+        fail("ES8311 device");
+        return;
+    }
 
     // Input
     i2c_cfg.addr = es7210_addr;
     in_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
-    assert(in_ctrl_if_ != NULL);
+    if (in_ctrl_if_ == nullptr) {
+        fail("ES7210 I2C control interface");
+        return;
+    }
 
     es7210_codec_cfg_t es7210_cfg = {};
     es7210_cfg.ctrl_if = in_ctrl_if_;
     es7210_cfg.mic_selected = es7210_mic_mask;
     in_codec_if_ = es7210_codec_new(&es7210_cfg);
-    assert(in_codec_if_ != NULL);
+    if (in_codec_if_ == nullptr) {
+        fail("ES7210 codec open");
+        return;
+    }
 
     dev_cfg.dev_type = ESP_CODEC_DEV_TYPE_IN;
     dev_cfg.codec_if = in_codec_if_;
     input_dev_ = esp_codec_dev_new(&dev_cfg);
-    assert(input_dev_ != NULL);
+    if (input_dev_ == nullptr) {
+        fail("ES7210 device");
+        return;
+    }
 
+    ready_ = true;
     ESP_LOGI(TAG, "BoxAudioDevice initialized (speaker_pa=%s)",
              speaker_pa_enabled_ ? "enabled" : "disabled");
 }
 
 BoxAudioCodec::~BoxAudioCodec() {
-    ESP_ERROR_CHECK(esp_codec_dev_close(output_dev_));
-    esp_codec_dev_delete(output_dev_);
-    ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
-    esp_codec_dev_delete(input_dev_);
+    ready_ = false;
+    if (input_dev_ != nullptr) {
+        const int result = esp_codec_dev_close(input_dev_);
+        if (result != ESP_CODEC_DEV_OK) {
+            ESP_LOGW(TAG, "input device close failed: %d", result);
+        }
+        esp_codec_dev_delete(input_dev_);
+    }
+    if (output_dev_ != nullptr) {
+        const int result = esp_codec_dev_close(output_dev_);
+        if (result != ESP_CODEC_DEV_OK) {
+            ESP_LOGW(TAG, "output device close failed: %d", result);
+        }
+        esp_codec_dev_delete(output_dev_);
+    }
+    if (in_codec_if_ != nullptr) audio_codec_delete_codec_if(in_codec_if_);
+    if (in_ctrl_if_ != nullptr) audio_codec_delete_ctrl_if(in_ctrl_if_);
+    if (out_codec_if_ != nullptr) audio_codec_delete_codec_if(out_codec_if_);
+    if (out_ctrl_if_ != nullptr) audio_codec_delete_ctrl_if(out_ctrl_if_);
+    if (gpio_if_ != nullptr) audio_codec_delete_gpio_if(gpio_if_);
+    if (data_if_ != nullptr) audio_codec_delete_data_if(data_if_);
 
-    audio_codec_delete_codec_if(in_codec_if_);
-    audio_codec_delete_ctrl_if(in_ctrl_if_);
-    audio_codec_delete_codec_if(out_codec_if_);
-    audio_codec_delete_ctrl_if(out_ctrl_if_);
-    audio_codec_delete_gpio_if(gpio_if_);
-    audio_codec_delete_data_if(data_if_);
+    if (rx_handle_ != nullptr) {
+        if (rx_enabled_) {
+            const esp_err_t result = i2s_channel_disable(rx_handle_);
+            if (result != ESP_OK && result != ESP_ERR_INVALID_STATE) {
+                ESP_LOGW(TAG, "RX disable failed: %s", esp_err_to_name(result));
+            }
+        }
+        const esp_err_t result = i2s_del_channel(rx_handle_);
+        if (result != ESP_OK) {
+            ESP_LOGE(TAG, "RX delete failed: %s", esp_err_to_name(result));
+        }
+    }
+    if (tx_handle_ != nullptr) {
+        if (tx_enabled_) {
+            const esp_err_t result = i2s_channel_disable(tx_handle_);
+            if (result != ESP_OK && result != ESP_ERR_INVALID_STATE) {
+                ESP_LOGW(TAG, "TX disable failed: %s", esp_err_to_name(result));
+            }
+        }
+        const esp_err_t result = i2s_del_channel(tx_handle_);
+        if (result != ESP_OK) {
+            ESP_LOGE(TAG, "TX delete failed: %s", esp_err_to_name(result));
+        }
+    }
 }
 
-void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
-    assert(input_sample_rate_ == output_sample_rate_);
+bool BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
+    if (input_sample_rate_ != output_sample_rate_) {
+        ESP_LOGE(TAG, "I2S input/output sample-rate mismatch");
+        return false;
+    }
 
     i2s_chan_config_t chan_cfg = {
         .id = I2S_NUM_0,
@@ -114,7 +189,11 @@ void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
         .auto_clear_before_cb = false,
         .intr_priority = 0,
     };
-    ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, &tx_handle_, &rx_handle_));
+    esp_err_t result = i2s_new_channel(&chan_cfg, &tx_handle_, &rx_handle_);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "I2S channel creation failed: %s", esp_err_to_name(result));
+        return false;
+    }
 
     i2s_std_config_t std_cfg = {
         .clk_cfg = {
@@ -185,18 +264,37 @@ void BoxAudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_
         }
     };
 
-    ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_handle_, &std_cfg));
+    result = i2s_channel_init_std_mode(tx_handle_, &std_cfg);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "I2S TX initialization failed: %s", esp_err_to_name(result));
+        return false;
+    }
     if (std_stereo_input_) {
         i2s_std_config_t rx_std_cfg = std_cfg;
         rx_std_cfg.gpio_cfg.dout = I2S_GPIO_UNUSED;
         rx_std_cfg.gpio_cfg.din = din;
-        ESP_ERROR_CHECK(i2s_channel_init_std_mode(rx_handle_, &rx_std_cfg));
+        result = i2s_channel_init_std_mode(rx_handle_, &rx_std_cfg);
     } else {
-        ESP_ERROR_CHECK(i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg));
+        result = i2s_channel_init_tdm_mode(rx_handle_, &tdm_cfg);
     }
-    ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
-    ESP_ERROR_CHECK(i2s_channel_enable(rx_handle_));
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "I2S RX initialization failed: %s", esp_err_to_name(result));
+        return false;
+    }
+    result = i2s_channel_enable(tx_handle_);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "I2S TX enable failed: %s", esp_err_to_name(result));
+        return false;
+    }
+    tx_enabled_ = true;
+    result = i2s_channel_enable(rx_handle_);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "I2S RX enable failed: %s", esp_err_to_name(result));
+        return false;
+    }
+    rx_enabled_ = true;
     ESP_LOGI(TAG, "Duplex channels created");
+    return true;
 }
 
 void BoxAudioCodec::SetOutputVolume(int volume) {
