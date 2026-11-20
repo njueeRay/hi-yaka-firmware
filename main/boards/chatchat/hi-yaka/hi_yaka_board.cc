@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <inttypes.h>
@@ -665,8 +666,9 @@ private:
             ESP_LOGI(TAG, "BRINGUP ACT_B microphone stop requested");
             return;
         }
-        if (audio_codec_ == nullptr || storage_ == nullptr || !storage_->ready() ||
-            feedback_ == nullptr) {
+        if (audio_codec_ == nullptr || audio_codec_->input_channels() == 0 ||
+            (!lab_record_autotest_.load() &&
+             (storage_ == nullptr || !storage_->ready())) || feedback_ == nullptr) {
             ESP_LOGE(TAG, "BRINGUP ACT_B microphone unavailable: codec=%d TF=%d light=%d",
                      audio_codec_ != nullptr, storage_ != nullptr && storage_->ready(),
                      feedback_ != nullptr);
@@ -694,8 +696,15 @@ private:
                 uint64_t samples_written = 0;
                 uint64_t nonzero_samples = 0;
                 uint64_t varying_samples = 0;
+                uint64_t sum_squares = 0;
                 std::vector<int16_t> previous_by_channel(channels, 0);
                 std::vector<bool> previous_valid(channels, false);
+                std::vector<int> channel_min(channels, 32767);
+                std::vector<int> channel_max(channels, -32768);
+                std::vector<uint64_t> channel_varying(channels, 0);
+                std::vector<uint64_t> channel_nonzero(channels, 0);
+                std::vector<uint64_t> channel_samples(channels, 0);
+                std::vector<uint64_t> channel_sum_squares(channels, 0);
                 int peak = 0;
                 int minimum = 32767;
                 int maximum = -32768;
@@ -703,11 +712,19 @@ private:
                 bool all_minus_one = true;
                 bool read_failed = false;
                 bool write_failed = false;
+                bool enable_failed = false;
                 int64_t autotest_deadline_us = 0;
-                const bool opened = writer.Open(
+                const bool wav_requested = self->storage_ != nullptr &&
+                    self->storage_->ready();
+                const bool opened = wav_requested && writer.Open(
                     path, self->audio_codec_->input_sample_rate(), channels);
-                if (opened) {
+                if (wav_requested && !opened) write_failed = true;
+                {
                     self->audio_codec_->EnableInput(true);
+                    enable_failed = !self->audio_codec_->input_enabled();
+                    if (enable_failed) {
+                        ESP_LOGE(TAG, "BRINGUP MIC RECORD input enable failed");
+                    } else {
                     vTaskDelay(pdMS_TO_TICKS(150));
                     self->audio_codec_->LogInputDiagnostics();
                     LogI2sPadEdges("MCLK", YAKA_AUDIO_MCLK_GPIO, 1000);
@@ -740,10 +757,10 @@ private:
                             ESP_LOGE(TAG, "BRINGUP MIC RECORD input read failed");
                             break;
                         }
-                        if (!writer.Append(samples.data(), samples.size())) {
+                        if (opened && !write_failed &&
+                            !writer.Append(samples.data(), samples.size())) {
                             write_failed = true;
                             ESP_LOGE(TAG, "BRINGUP MIC RECORD WAV write failed");
-                            break;
                         }
                         for (std::size_t index = 0; index < samples.size(); ++index) {
                             const int16_t sample = samples[index];
@@ -757,50 +774,81 @@ private:
                             all_zero = all_zero && sample == 0;
                             all_minus_one = all_minus_one && sample == -1;
                             nonzero_samples += sample != 0;
+                            sum_squares += static_cast<uint64_t>(static_cast<int64_t>(sample) * sample);
                             varying_samples += previous_valid[channel] &&
                                                previous_by_channel[channel] != sample;
+                            channel_varying[channel] += previous_valid[channel] &&
+                                previous_by_channel[channel] != sample;
+                            channel_nonzero[channel] += sample != 0;
+                            ++channel_samples[channel];
+                            channel_min[channel] = std::min(channel_min[channel], static_cast<int>(sample));
+                            channel_max[channel] = std::max(channel_max[channel], static_cast<int>(sample));
+                            channel_sum_squares[channel] +=
+                                static_cast<uint64_t>(static_cast<int64_t>(sample) * sample);
                             previous_by_channel[channel] = sample;
                             previous_valid[channel] = true;
                         }
                         samples_written += samples.size();
                     }
                     self->audio_codec_->EnableInput(false);
+                    }
                 }
-                const bool closed = writer.Close();
+                const bool closed = opened && writer.Close();
                 if (samples_written == 0) {
                     minimum = 0;
                     maximum = 0;
                     all_zero = false;
                     all_minus_one = false;
                 }
-                const char* stop_reason = !opened ? "wav_open_failed" :
+                const char* stop_reason = enable_failed ? "input_enable_failed" :
                     read_failed ? "input_read_failed" :
-                    write_failed ? "wav_write_failed" :
                     self->lab_record_stop_requested_.load() ? "stop_request" :
                     autotest && esp_timer_get_time() >= autotest_deadline_us ?
                         "autotest_deadline" : "sample_limit";
-                const bool candidate_signal = samples_written > 0 && nonzero_samples > 0 &&
-                    varying_samples > 0 && maximum - minimum > 8 &&
-                    !read_failed && !write_failed && closed;
+                const char* wav_status = !wav_requested ? "unavailable" :
+                    !opened ? "open_failed" : write_failed ? "write_failed" :
+                    !closed ? "close_failed" : "closed";
+                bool each_channel_candidate = channels > 0;
+                for (std::size_t channel = 0; channel < channels; ++channel) {
+                    const bool candidate = channel_samples[channel] > 0 &&
+                        channel_nonzero[channel] > 0 && channel_varying[channel] > 8 &&
+                        channel_max[channel] - channel_min[channel] > 8;
+                    each_channel_candidate = each_channel_candidate && candidate;
+                    const double channel_rms = channel_samples[channel] > 0 ?
+                        std::sqrt(static_cast<double>(channel_sum_squares[channel]) /
+                                  channel_samples[channel]) : 0.0;
+                    ESP_LOGI(TAG, "AUTOTEST_CHANNEL index=%u samples=%llu nonzero=%llu varying=%llu min=%d max=%d rms=%.2f candidate=%d",
+                             static_cast<unsigned>(channel),
+                             static_cast<unsigned long long>(channel_samples[channel]),
+                             static_cast<unsigned long long>(channel_nonzero[channel]),
+                             static_cast<unsigned long long>(channel_varying[channel]),
+                             channel_samples[channel] ? channel_min[channel] : 0,
+                             channel_samples[channel] ? channel_max[channel] : 0,
+                             channel_rms, candidate);
+                }
+                const bool candidate_signal = each_channel_candidate &&
+                    !enable_failed && !read_failed;
+                const double rms = samples_written > 0 ?
+                    std::sqrt(static_cast<double>(sum_squares) / samples_written) : 0.0;
                 ESP_LOGI(TAG, "BRINGUP MIC RECORD STOP: %s samples=%llu peak=%d "
                          "nonzero=%llu varying=%llu min=%d max=%d all_zero=%d "
                          "all_minus_one=%d candidate_signal=%d stop_reason=%s "
-                         "wav_opened=%d read_failed=%d write_failed=%d wav_closed=%d",
+                         "rms=%.2f wav_status=%s wav_requested=%d wav_opened=%d enable_failed=%d read_failed=%d write_failed=%d wav_closed=%d",
                          path, static_cast<unsigned long long>(samples_written), peak,
                          static_cast<unsigned long long>(nonzero_samples),
                          static_cast<unsigned long long>(varying_samples), minimum, maximum,
-                         all_zero, all_minus_one, candidate_signal, stop_reason, opened,
-                         read_failed, write_failed, closed);
+                         all_zero, all_minus_one, candidate_signal, stop_reason,
+                         rms, wav_status, wav_requested, opened, enable_failed, read_failed, write_failed, closed);
                 if (autotest) {
                     ESP_LOGI(TAG, "AUTOTEST_RESULT path=%s samples=%llu peak=%d "
                              "nonzero=%llu varying=%llu min=%d max=%d all_zero=%d "
                              "all_minus_one=%d candidate_signal=%d stop_reason=%s "
-                             "wav_opened=%d read_failed=%d write_failed=%d wav_closed=%d",
+                             "rms=%.2f wav_status=%s wav_requested=%d wav_opened=%d enable_failed=%d read_failed=%d write_failed=%d wav_closed=%d",
                              path, static_cast<unsigned long long>(samples_written), peak,
                              static_cast<unsigned long long>(nonzero_samples),
                              static_cast<unsigned long long>(varying_samples), minimum, maximum,
-                             all_zero, all_minus_one, candidate_signal, stop_reason, opened,
-                             read_failed, write_failed, closed);
+                             all_zero, all_minus_one, candidate_signal, stop_reason,
+                             rms, wav_status, wav_requested, opened, enable_failed, read_failed, write_failed, closed);
                     self->lab_record_autotest_wav_closed_.store(closed);
                     self->lab_record_autotest_done_.store(true);
                 }
@@ -996,7 +1044,7 @@ private:
                                    self->recording_store_ != nullptr;
                 const bool feedback_ok = self->feedback_ != nullptr;
                 const bool pa_low = gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
-                const bool allowed = pca_ok && codec_ok && tf_ok && feedback_ok && pa_low;
+                const bool allowed = pca_ok && codec_ok && feedback_ok && pa_low;
                 ESP_LOGI(TAG, "AUTOTEST_GATE pca=%d codec=%d channels=%u tf=%d "
                          "feedback=%d pa_low=%d allowed=%d", pca_ok, codec_ok,
                          codec_ok ? static_cast<unsigned>(self->audio_codec_->input_channels()) : 0,
@@ -1008,8 +1056,6 @@ private:
                             self->audio_codec_ != nullptr &&
                             self->audio_codec_->input_channels() > 0 &&
                             self->audio_codec_->input_sample_rate() > 0 &&
-                            self->storage_ != nullptr &&
-                            self->storage_->ready() && self->recording_store_ != nullptr &&
                             self->feedback_ != nullptr &&
                             gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
                         if (!still_safe || self->lab_record_active_.load()) {

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <esp_timer.h>
 #include <esp_rom_sys.h>
+#include <freertos/semphr.h>
 
 #define TAG "BoxAudioCodec"
 
@@ -42,6 +43,8 @@ struct ObservedCtrl {
     uint32_t terminal_ops;
     bool capture_active;
     bool read_fault_latched;
+    bool terminal_fault_latched;
+    SemaphoreHandle_t mutex;
     CtrlFailure events[64];
 };
 
@@ -95,60 +98,63 @@ bool observed_is_open(const audio_codec_ctrl_if_t* base) {
 int observed_read(const audio_codec_ctrl_if_t* base, int reg, int reg_len,
                   void* data, int data_len) {
     auto* ctrl = observed(base);
-    if (!ctrl->capture_active) {
-        return ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
-    }
-    ++ctrl->sequence;
+    xSemaphoreTake(ctrl->mutex, portMAX_DELAY);
+    const bool capture = ctrl->capture_active;
+    if (capture) ++ctrl->sequence;
     int result = ESP_CODEC_DEV_READ_FAIL;
     for (int attempt = 1; attempt <= kEs7210MaxAttempts; ++attempt) {
         result = ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
         if (result == ESP_CODEC_DEV_OK) {
-            if (attempt > 1) ++ctrl->recovered_ops;
+            if (capture && attempt > 1) ++ctrl->recovered_ops;
             break;
         }
         const bool terminal = attempt == kEs7210MaxAttempts;
-        record_failure(ctrl, false, false, reg, reg_len, nullptr, data_len,
-                       result, attempt, terminal);
-        if (terminal) {
+        if (capture) record_failure(ctrl, false, false, reg, reg_len, nullptr,
+                                    data_len, result, attempt, terminal);
+        if (terminal && capture) {
             ++ctrl->terminal_ops;
             ctrl->read_fault_latched = true;
+            ctrl->terminal_fault_latched = true;
         } else {
             esp_rom_delay_us(kEs7210RetryDelayUs);
         }
     }
-    finalize_attempts(ctrl, result);
+    if (capture) finalize_attempts(ctrl, result);
+    xSemaphoreGive(ctrl->mutex);
     return result;
 }
 
 int observed_write(const audio_codec_ctrl_if_t* base, int reg, int reg_len,
                    void* data, int data_len) {
     auto* ctrl = observed(base);
-    if (!ctrl->capture_active) {
-        return ctrl->inner->write_reg(ctrl->inner, reg, reg_len, data, data_len);
-    }
-    ++ctrl->sequence;
-    if (ctrl->read_fault_latched) {
+    xSemaphoreTake(ctrl->mutex, portMAX_DELAY);
+    const bool capture = ctrl->capture_active;
+    if (capture) ++ctrl->sequence;
+    if (capture && ctrl->terminal_fault_latched) {
         record_failure(ctrl, true, true, reg, reg_len, data, data_len,
                        ESP_CODEC_DEV_WRITE_FAIL, 0, true);
+        xSemaphoreGive(ctrl->mutex);
         return ESP_CODEC_DEV_WRITE_FAIL;
     }
     int result = ESP_CODEC_DEV_WRITE_FAIL;
     for (int attempt = 1; attempt <= kEs7210MaxAttempts; ++attempt) {
         result = ctrl->inner->write_reg(ctrl->inner, reg, reg_len, data, data_len);
         if (result == ESP_CODEC_DEV_OK) {
-            if (attempt > 1) ++ctrl->recovered_ops;
+            if (capture && attempt > 1) ++ctrl->recovered_ops;
             break;
         }
         const bool terminal = attempt == kEs7210MaxAttempts;
-        record_failure(ctrl, true, false, reg, reg_len, data, data_len,
-                       result, attempt, terminal);
-        if (terminal) {
+        if (capture) record_failure(ctrl, true, false, reg, reg_len, data,
+                                    data_len, result, attempt, terminal);
+        if (terminal && capture) {
             ++ctrl->terminal_ops;
+            ctrl->terminal_fault_latched = true;
         } else {
             esp_rom_delay_us(kEs7210RetryDelayUs);
         }
     }
-    finalize_attempts(ctrl, result);
+    if (capture) finalize_attempts(ctrl, result);
+    xSemaphoreGive(ctrl->mutex);
     return result;
 }
 
@@ -162,6 +168,8 @@ int observed_close(const audio_codec_ctrl_if_t* base) {
     if (ctrl->inner == nullptr) return ESP_CODEC_DEV_OK;
     const int result = audio_codec_delete_ctrl_if(ctrl->inner);
     ctrl->inner = nullptr;
+    vSemaphoreDelete(ctrl->mutex);
+    ctrl->mutex = nullptr;
     return result;
 }
 
@@ -173,6 +181,11 @@ const audio_codec_ctrl_if_t* make_observed_ctrl(const audio_codec_ctrl_if_t* inn
     ctrl->addr = addr;
     ctrl->codec_name = codec_name;
     ctrl->capture_active = true;
+    ctrl->mutex = xSemaphoreCreateMutex();
+    if (ctrl->mutex == nullptr) {
+        std::free(ctrl);
+        return nullptr;
+    }
     ctrl->base.open = observed_open;
     ctrl->base.is_open = observed_is_open;
     ctrl->base.read_reg = observed_read;
@@ -183,17 +196,43 @@ const audio_codec_ctrl_if_t* make_observed_ctrl(const audio_codec_ctrl_if_t* inn
 }
 
 void stop_observed_ctrl(const audio_codec_ctrl_if_t* base) {
-    observed(base)->capture_active = false;
+    auto* ctrl = observed(base);
+    xSemaphoreTake(ctrl->mutex, portMAX_DELAY);
+    ctrl->capture_active = false;
+    xSemaphoreGive(ctrl->mutex);
+}
+
+void begin_observed_ctrl(const audio_codec_ctrl_if_t* base) {
+    auto* ctrl = observed(base);
+    xSemaphoreTake(ctrl->mutex, portMAX_DELAY);
+    ctrl->sequence = 0;
+    ctrl->failures = 0;
+    ctrl->recovered_ops = 0;
+    ctrl->terminal_ops = 0;
+    ctrl->read_fault_latched = false;
+    ctrl->terminal_fault_latched = false;
+    ctrl->capture_active = true;
+    xSemaphoreGive(ctrl->mutex);
+}
+
+bool observed_ctrl_faulted(const audio_codec_ctrl_if_t* base) {
+    auto* ctrl = observed(base);
+    xSemaphoreTake(ctrl->mutex, portMAX_DELAY);
+    const bool faulted = ctrl->terminal_fault_latched || ctrl->terminal_ops != 0;
+    xSemaphoreGive(ctrl->mutex);
+    return faulted;
 }
 
 void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
     auto* ctrl = observed(base);
+    xSemaphoreTake(ctrl->mutex, portMAX_DELAY);
     ctrl->capture_active = false;
-    ESP_LOGI(TAG, "%s_CTRL_SUMMARY addr=0x%02x ops=%lu failed_attempts=%lu recovered_ops=%lu terminal_ops=%lu read_fault_guard=%d max_attempts=%d retry_delay_us=%lu",
+    ESP_LOGI(TAG, "%s_CTRL_SUMMARY addr=0x%02x ops=%lu failed_attempts=%lu recovered_ops=%lu terminal_ops=%lu read_fault_guard=%d terminal_fault_guard=%d max_attempts=%d retry_delay_us=%lu",
              ctrl->codec_name, ctrl->addr, static_cast<unsigned long>(ctrl->sequence),
              static_cast<unsigned long>(ctrl->failures),
              static_cast<unsigned long>(ctrl->recovered_ops),
              static_cast<unsigned long>(ctrl->terminal_ops), ctrl->read_fault_latched,
+             ctrl->terminal_fault_latched,
              kEs7210MaxAttempts, static_cast<unsigned long>(kEs7210RetryDelayUs));
     const uint32_t count = std::min<uint32_t>(ctrl->failures, std::size(ctrl->events));
     for (uint32_t i = 0; i < count; ++i) {
@@ -210,6 +249,7 @@ void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
         ESP_LOGW(TAG, "%s_CTRL_FAILURE_OVERFLOW dropped=%lu",
                  ctrl->codec_name, static_cast<unsigned long>(ctrl->failures - count));
     }
+    xSemaphoreGive(ctrl->mutex);
 }
 }  // namespace
 
@@ -527,6 +567,10 @@ void BoxAudioCodec::SetOutputVolume(int volume) {
 
 void BoxAudioCodec::EnableInput(bool enable) {
     std::lock_guard<std::mutex> lock(data_if_mutex_);
+    if (!ready_ || input_dev_ == nullptr) {
+        ESP_LOGE(TAG, "input enable skipped: codec unavailable");
+        return;
+    }
     if (enable == input_enabled_) {
         return;
     }
@@ -541,24 +585,66 @@ void BoxAudioCodec::EnableInput(bool enable) {
         if (input_reference_) {
             fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
         }
-        ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
-        ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(
-            input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), input_gain_));
-        if (input_reference_ && reference_gain_channel_ >= 0) {
-            // ES7210 gain masks use physical MIC numbering, which differs
-            // from the TDM slot order (MIC1, MIC3, MIC2, MIC4).
+        if (graceful_init_failure_) {
+            begin_observed_ctrl(in_ctrl_if_);
+            const char* failed_stage = nullptr;
+            int result = esp_codec_dev_open(input_dev_, &fs);
+            if (result != ESP_CODEC_DEV_OK || observed_ctrl_faulted(in_ctrl_if_)) {
+                failed_stage = "open";
+            }
+            if (failed_stage == nullptr) {
+                result = esp_codec_dev_set_in_channel_gain(
+                    input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), input_gain_);
+                if (result != ESP_CODEC_DEV_OK || observed_ctrl_faulted(in_ctrl_if_)) {
+                    failed_stage = "mic1_gain";
+                }
+            }
+            if (failed_stage == nullptr && input_reference_ && reference_gain_channel_ >= 0) {
+                result = esp_codec_dev_set_in_channel_gain(
+                    input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(reference_gain_channel_),
+                    reference_gain_);
+                if (result != ESP_CODEC_DEV_OK || observed_ctrl_faulted(in_ctrl_if_)) {
+                    failed_stage = "reference_gain";
+                }
+            }
+            report_observed_ctrl(in_ctrl_if_);
+            if (failed_stage != nullptr) {
+                ESP_LOGE(TAG, "input enable failed stage=%s result=%d; closing partial device",
+                         failed_stage, result);
+                const int close_result = esp_codec_dev_close(input_dev_);
+                ESP_LOGW(TAG, "partial input close result=%d; not proof of hardware reset",
+                         close_result);
+                return;
+            }
+        } else {
+            ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
             ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(
-                input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(reference_gain_channel_),
-                reference_gain_));
+                input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), input_gain_));
+            if (input_reference_ && reference_gain_channel_ >= 0) {
+                ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(
+                    input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(reference_gain_channel_),
+                    reference_gain_));
+            }
         }
     } else {
-        ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
+        if (graceful_init_failure_) {
+            const int result = esp_codec_dev_close(input_dev_);
+            if (result != ESP_CODEC_DEV_OK) {
+                ESP_LOGE(TAG, "input close failed result=%d", result);
+            }
+        } else {
+            ESP_ERROR_CHECK(esp_codec_dev_close(input_dev_));
+        }
     }
     AudioCodec::EnableInput(enable);
 }
 
 void BoxAudioCodec::EnableOutput(bool enable) {
     std::lock_guard<std::mutex> lock(data_if_mutex_);
+    if (graceful_init_failure_ && !speaker_pa_enabled_) {
+        if (enable) ESP_LOGI(TAG, "output disabled for microphone-only diagnostic");
+        return;
+    }
     if (enable == output_enabled_) {
         return;
     }
