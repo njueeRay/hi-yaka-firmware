@@ -254,6 +254,9 @@ private:
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
     std::atomic<bool> lab_record_active_{false};
     std::atomic<bool> lab_record_stop_requested_{false};
+    std::atomic<bool> lab_record_autotest_{false};
+    std::atomic<bool> lab_record_autotest_done_{false};
+    std::atomic<bool> lab_record_autotest_wav_closed_{false};
     uint32_t lab_record_sequence_ = 0;
 #endif
 
@@ -669,6 +672,11 @@ private:
                      feedback_ != nullptr);
             return;
         }
+        if (audio_codec_->input_channels() == 0 ||
+            audio_codec_->input_sample_rate() == 0) {
+            ESP_LOGE(TAG, "BRINGUP ACT_B microphone unavailable: invalid channel/rate");
+            return;
+        }
 
         lab_record_stop_requested_.store(false);
         lab_record_active_.store(true);
@@ -682,9 +690,23 @@ private:
                               static_cast<unsigned long>(self->lab_record_sequence_));
                 HiYaKaWavWriter writer;
                 const std::size_t channels = self->audio_codec_->input_channels();
+                const bool autotest = self->lab_record_autotest_.load();
                 uint64_t samples_written = 0;
+                uint64_t nonzero_samples = 0;
+                uint64_t varying_samples = 0;
+                std::vector<int16_t> previous_by_channel(channels, 0);
+                std::vector<bool> previous_valid(channels, false);
                 int peak = 0;
-                if (writer.Open(path, self->audio_codec_->input_sample_rate(), channels)) {
+                int minimum = 32767;
+                int maximum = -32768;
+                bool all_zero = true;
+                bool all_minus_one = true;
+                bool read_failed = false;
+                bool write_failed = false;
+                int64_t autotest_deadline_us = 0;
+                const bool opened = writer.Open(
+                    path, self->audio_codec_->input_sample_rate(), channels);
+                if (opened) {
                     self->audio_codec_->EnableInput(true);
                     vTaskDelay(pdMS_TO_TICKS(150));
                     self->audio_codec_->LogInputDiagnostics();
@@ -699,6 +721,9 @@ private:
                                                (1ULL << YAKA_AUDIO_DIN_GPIO));
                     ESP_LOGI(TAG, "BRINGUP MIC RECORD START: %s channels=%u; R42/R45 measurement valid while red LEDs are on",
                              path, static_cast<unsigned>(channels));
+                    if (autotest) {
+                        autotest_deadline_us = esp_timer_get_time() + 6000000;
+                    }
                     constexpr std::size_t kFramesPerChunk = 320;
                     constexpr uint32_t kMaximumSeconds = 180;
                     const uint64_t sample_limit =
@@ -707,29 +732,84 @@ private:
                     std::vector<int16_t> samples(kFramesPerChunk * channels, 0);
                     while (!self->lab_record_stop_requested_.load() &&
                            samples_written < sample_limit) {
-                        if (!self->audio_codec_->InputData(samples) ||
-                            !writer.Append(samples.data(), samples.size())) {
-                            ESP_LOGE(TAG, "BRINGUP MIC RECORD read/write failed");
+                        if (autotest && esp_timer_get_time() >= autotest_deadline_us) {
                             break;
                         }
-                        for (int16_t sample : samples) {
+                        if (!self->audio_codec_->InputData(samples)) {
+                            read_failed = true;
+                            ESP_LOGE(TAG, "BRINGUP MIC RECORD input read failed");
+                            break;
+                        }
+                        if (!writer.Append(samples.data(), samples.size())) {
+                            write_failed = true;
+                            ESP_LOGE(TAG, "BRINGUP MIC RECORD WAV write failed");
+                            break;
+                        }
+                        for (std::size_t index = 0; index < samples.size(); ++index) {
+                            const int16_t sample = samples[index];
+                            const std::size_t channel =
+                                (samples_written + index) % channels;
                             const int magnitude = sample < 0 ? -static_cast<int>(sample)
                                                              : static_cast<int>(sample);
                             peak = std::max(peak, magnitude);
+                            minimum = std::min(minimum, static_cast<int>(sample));
+                            maximum = std::max(maximum, static_cast<int>(sample));
+                            all_zero = all_zero && sample == 0;
+                            all_minus_one = all_minus_one && sample == -1;
+                            nonzero_samples += sample != 0;
+                            varying_samples += previous_valid[channel] &&
+                                               previous_by_channel[channel] != sample;
+                            previous_by_channel[channel] = sample;
+                            previous_valid[channel] = true;
                         }
                         samples_written += samples.size();
                     }
                     self->audio_codec_->EnableInput(false);
                 }
                 const bool closed = writer.Close();
-                ESP_LOGI(TAG, "BRINGUP MIC RECORD STOP: %s samples=%llu peak=%d wav_closed=%d",
+                if (samples_written == 0) {
+                    minimum = 0;
+                    maximum = 0;
+                    all_zero = false;
+                    all_minus_one = false;
+                }
+                const char* stop_reason = !opened ? "wav_open_failed" :
+                    read_failed ? "input_read_failed" :
+                    write_failed ? "wav_write_failed" :
+                    self->lab_record_stop_requested_.load() ? "stop_request" :
+                    autotest && esp_timer_get_time() >= autotest_deadline_us ?
+                        "autotest_deadline" : "sample_limit";
+                const bool candidate_signal = samples_written > 0 && nonzero_samples > 0 &&
+                    varying_samples > 0 && maximum - minimum > 8 &&
+                    !read_failed && !write_failed && closed;
+                ESP_LOGI(TAG, "BRINGUP MIC RECORD STOP: %s samples=%llu peak=%d "
+                         "nonzero=%llu varying=%llu min=%d max=%d all_zero=%d "
+                         "all_minus_one=%d candidate_signal=%d stop_reason=%s "
+                         "wav_opened=%d read_failed=%d write_failed=%d wav_closed=%d",
                          path, static_cast<unsigned long long>(samples_written), peak,
-                         closed);
+                         static_cast<unsigned long long>(nonzero_samples),
+                         static_cast<unsigned long long>(varying_samples), minimum, maximum,
+                         all_zero, all_minus_one, candidate_signal, stop_reason, opened,
+                         read_failed, write_failed, closed);
+                if (autotest) {
+                    ESP_LOGI(TAG, "AUTOTEST_RESULT path=%s samples=%llu peak=%d "
+                             "nonzero=%llu varying=%llu min=%d max=%d all_zero=%d "
+                             "all_minus_one=%d candidate_signal=%d stop_reason=%s "
+                             "wav_opened=%d read_failed=%d write_failed=%d wav_closed=%d",
+                             path, static_cast<unsigned long long>(samples_written), peak,
+                             static_cast<unsigned long long>(nonzero_samples),
+                             static_cast<unsigned long long>(varying_samples), minimum, maximum,
+                             all_zero, all_minus_one, candidate_signal, stop_reason, opened,
+                             read_failed, write_failed, closed);
+                    self->lab_record_autotest_wav_closed_.store(closed);
+                    self->lab_record_autotest_done_.store(true);
+                }
                 Application::GetInstance().Schedule([self]() {
                     if (self->feedback_ != nullptr) {
                         self->feedback_->SetLabRecordingIndicator(false);
                     }
                     self->lab_record_active_.store(false);
+                    self->lab_record_autotest_.store(false);
                 });
                 vTaskDelete(nullptr);
             },
@@ -906,6 +986,78 @@ private:
 
                 ESP_LOGI(TAG,
                          "BRINGUP READY: PWR_A pulses motor; ACT_B toggles microphone WAV and red lights");
+
+                const bool pca_ok = self->pca_safe_state_verified_ &&
+                                    self->pca9557_ != nullptr && self->pca9557_->ready();
+                const bool codec_ok = self->audio_codec_ != nullptr &&
+                                      self->audio_codec_->input_channels() > 0 &&
+                                      self->audio_codec_->input_sample_rate() > 0;
+                const bool tf_ok = self->storage_ != nullptr && self->storage_->ready() &&
+                                   self->recording_store_ != nullptr;
+                const bool feedback_ok = self->feedback_ != nullptr;
+                const bool pa_low = gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
+                const bool allowed = pca_ok && codec_ok && tf_ok && feedback_ok && pa_low;
+                ESP_LOGI(TAG, "AUTOTEST_GATE pca=%d codec=%d channels=%u tf=%d "
+                         "feedback=%d pa_low=%d allowed=%d", pca_ok, codec_ok,
+                         codec_ok ? static_cast<unsigned>(self->audio_codec_->input_channels()) : 0,
+                         tf_ok, feedback_ok, pa_low, allowed);
+                if (allowed) {
+                    Application::GetInstance().Schedule([self]() {
+                        const bool still_safe = self->pca_safe_state_verified_ &&
+                            self->pca9557_ != nullptr && self->pca9557_->ready() &&
+                            self->audio_codec_ != nullptr &&
+                            self->audio_codec_->input_channels() > 0 &&
+                            self->audio_codec_->input_sample_rate() > 0 &&
+                            self->storage_ != nullptr &&
+                            self->storage_->ready() && self->recording_store_ != nullptr &&
+                            self->feedback_ != nullptr &&
+                            gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
+                        if (!still_safe || self->lab_record_active_.load()) {
+                            ESP_LOGE(TAG, "AUTOTEST_START skipped: gate=%d active=%d",
+                                     still_safe, self->lab_record_active_.load());
+                            return;
+                        }
+                        self->lab_record_autotest_done_.store(false);
+                        self->lab_record_autotest_wav_closed_.store(false);
+                        self->lab_record_autotest_.store(true);
+                        ESP_LOGI(TAG, "AUTOTEST_START requested at uptime_ms=%lld",
+                                 static_cast<long long>(esp_timer_get_time() / 1000));
+                        self->ToggleLabRecording();
+                        if (!self->lab_record_active_.load()) {
+                            self->lab_record_autotest_.store(false);
+                            ESP_LOGE(TAG, "AUTOTEST_START failed to activate recording");
+                        }
+                    });
+                    for (int wait = 0; wait < 20 &&
+                         !self->lab_record_active_.load(); ++wait) {
+                        vTaskDelay(pdMS_TO_TICKS(100));
+                    }
+                    if (self->lab_record_active_.load()) {
+                        vTaskDelay(pdMS_TO_TICKS(5000));
+                        Application::GetInstance().Schedule([self]() {
+                            ESP_LOGI(TAG, "AUTOTEST_STOP requested at uptime_ms=%lld active=%d",
+                                     static_cast<long long>(esp_timer_get_time() / 1000),
+                                     self->lab_record_active_.load());
+                            if (self->lab_record_active_.load()) {
+                                self->ToggleLabRecording();
+                            }
+                        });
+                        for (int wait = 0; wait < 100 &&
+                             !self->lab_record_autotest_done_.load(); ++wait) {
+                            vTaskDelay(pdMS_TO_TICKS(100));
+                        }
+                        ESP_LOGI(TAG, "AUTOTEST_FINISH done=%d wav_closed=%d active=%d",
+                                 self->lab_record_autotest_done_.load(),
+                                 self->lab_record_autotest_wav_closed_.load(),
+                                 self->lab_record_active_.load());
+                    } else if (self->lab_record_autotest_done_.load()) {
+                        ESP_LOGW(TAG, "AUTOTEST_FINISH recording ended before timed stop "
+                                 "wav_closed=%d",
+                                 self->lab_record_autotest_wav_closed_.load());
+                    } else {
+                        ESP_LOGE(TAG, "AUTOTEST_START timed out without active recording");
+                    }
+                }
                 vTaskDelete(nullptr);
             },
             "hi_yaka_diag", 6144, this, 4, nullptr);
