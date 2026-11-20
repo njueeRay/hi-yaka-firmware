@@ -34,6 +34,7 @@ struct CtrlFailure {
 struct ObservedCtrl {
     audio_codec_ctrl_if_t base;
     const audio_codec_ctrl_if_t* inner;
+    const char* codec_name;
     uint8_t addr;
     uint32_t sequence;
     uint32_t failures;
@@ -165,11 +166,12 @@ int observed_close(const audio_codec_ctrl_if_t* base) {
 }
 
 const audio_codec_ctrl_if_t* make_observed_ctrl(const audio_codec_ctrl_if_t* inner,
-                                                uint8_t addr) {
+                                                uint8_t addr, const char* codec_name) {
     auto* ctrl = static_cast<ObservedCtrl*>(std::calloc(1, sizeof(ObservedCtrl)));
     if (ctrl == nullptr) return nullptr;
     ctrl->inner = inner;
     ctrl->addr = addr;
+    ctrl->codec_name = codec_name;
     ctrl->capture_active = true;
     ctrl->base.open = observed_open;
     ctrl->base.is_open = observed_is_open;
@@ -180,11 +182,15 @@ const audio_codec_ctrl_if_t* make_observed_ctrl(const audio_codec_ctrl_if_t* inn
     return &ctrl->base;
 }
 
+void stop_observed_ctrl(const audio_codec_ctrl_if_t* base) {
+    observed(base)->capture_active = false;
+}
+
 void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
     auto* ctrl = observed(base);
     ctrl->capture_active = false;
-    ESP_LOGI(TAG, "ES7210_CTRL_SUMMARY addr=0x%02x ops=%lu failed_attempts=%lu recovered_ops=%lu terminal_ops=%lu read_fault_guard=%d max_attempts=%d retry_delay_us=%lu",
-             ctrl->addr, static_cast<unsigned long>(ctrl->sequence),
+    ESP_LOGI(TAG, "%s_CTRL_SUMMARY addr=0x%02x ops=%lu failed_attempts=%lu recovered_ops=%lu terminal_ops=%lu read_fault_guard=%d max_attempts=%d retry_delay_us=%lu",
+             ctrl->codec_name, ctrl->addr, static_cast<unsigned long>(ctrl->sequence),
              static_cast<unsigned long>(ctrl->failures),
              static_cast<unsigned long>(ctrl->recovered_ops),
              static_cast<unsigned long>(ctrl->terminal_ops), ctrl->read_fault_latched,
@@ -192,7 +198,8 @@ void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
     const uint32_t count = std::min<uint32_t>(ctrl->failures, std::size(ctrl->events));
     for (uint32_t i = 0; i < count; ++i) {
         const auto& e = ctrl->events[i];
-        ESP_LOGW(TAG, "ES7210_CTRL_ATTEMPT seq=%lu t_us=%lld addr=0x%02x op=%s reg=0x%02x reg_len=%d data_len=%d value=%02x%02x%02x%02x ret=%d attempt=%d final_ret=%d recovered=%d terminal=%d blocked=%d",
+        ESP_LOGW(TAG, "%s_CTRL_ATTEMPT seq=%lu t_us=%lld addr=0x%02x op=%s reg=0x%02x reg_len=%d data_len=%d value=%02x%02x%02x%02x ret=%d attempt=%d final_ret=%d recovered=%d terminal=%d blocked=%d",
+                 ctrl->codec_name,
                  static_cast<unsigned long>(e.sequence), static_cast<long long>(e.time_us),
                  ctrl->addr, e.write ? "write" : "read", e.reg, e.reg_len, e.data_len,
                  e.value[0], e.value[1], e.value[2], e.value[3], e.result,
@@ -200,8 +207,8 @@ void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
                  e.terminal, e.blocked);
     }
     if (ctrl->failures > count) {
-        ESP_LOGW(TAG, "ES7210_CTRL_FAILURE_OVERFLOW dropped=%lu",
-                 static_cast<unsigned long>(ctrl->failures - count));
+        ESP_LOGW(TAG, "%s_CTRL_FAILURE_OVERFLOW dropped=%lu",
+                 ctrl->codec_name, static_cast<unsigned long>(ctrl->failures - count));
     }
 }
 }  // namespace
@@ -256,7 +263,13 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
         .addr = es8311_addr,
         .bus_handle = i2c_master_handle,
     };
-    out_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    const auto* es8311_inner_ctrl = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    if (es8311_inner_ctrl != nullptr && graceful_init_failure_) {
+        out_ctrl_if_ = make_observed_ctrl(es8311_inner_ctrl, es8311_addr, "ES8311");
+        if (out_ctrl_if_ == nullptr) audio_codec_delete_ctrl_if(es8311_inner_ctrl);
+    } else {
+        out_ctrl_if_ = es8311_inner_ctrl;
+    }
     if (out_ctrl_if_ == nullptr) {
         fail("ES8311 I2C control interface");
         return;
@@ -277,7 +290,9 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es8311_cfg.hw_gain.pa_voltage = 5.0;
     es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
     out_codec_if_ = es8311_codec_new(&es8311_cfg);
+    if (graceful_init_failure_) stop_observed_ctrl(out_ctrl_if_);
     if (out_codec_if_ == nullptr) {
+        if (graceful_init_failure_) report_observed_ctrl(out_ctrl_if_);
         fail("ES8311 codec open");
         return;
     }
@@ -297,7 +312,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     i2c_cfg.addr = es7210_addr;
     const auto* es7210_inner_ctrl = audio_codec_new_i2c_ctrl(&i2c_cfg);
     if (es7210_inner_ctrl != nullptr && graceful_init_failure_) {
-        in_ctrl_if_ = make_observed_ctrl(es7210_inner_ctrl, es7210_addr);
+        in_ctrl_if_ = make_observed_ctrl(es7210_inner_ctrl, es7210_addr, "ES7210");
         if (in_ctrl_if_ == nullptr) audio_codec_delete_ctrl_if(es7210_inner_ctrl);
     } else {
         in_ctrl_if_ = es7210_inner_ctrl;
@@ -311,7 +326,10 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es7210_cfg.ctrl_if = in_ctrl_if_;
     es7210_cfg.mic_selected = es7210_mic_mask;
     in_codec_if_ = es7210_codec_new(&es7210_cfg);
-    if (graceful_init_failure_) report_observed_ctrl(in_ctrl_if_);
+    if (graceful_init_failure_) {
+        report_observed_ctrl(in_ctrl_if_);
+        report_observed_ctrl(out_ctrl_if_);
+    }
     if (in_codec_if_ == nullptr) {
         fail("ES7210 codec open");
         return;
