@@ -1035,6 +1035,14 @@ private:
                 ESP_LOGI(TAG,
                          "BRINGUP READY: PWR_A pulses motor; ACT_B toggles microphone WAV and red lights");
 
+                constexpr int64_t kAutotestStartUs = 88LL * 1000 * 1000;
+                const int64_t remaining_us = kAutotestStartUs - esp_timer_get_time();
+                if (remaining_us > 0) {
+                    ESP_LOGI(TAG, "AUTOTEST_WAIT target_uptime_ms=88000 remaining_ms=%lld",
+                             static_cast<long long>(remaining_us / 1000));
+                    vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(remaining_us / 1000)));
+                }
+
                 const bool pca_ok = self->pca_safe_state_verified_ &&
                                     self->pca9557_ != nullptr && self->pca9557_->ready();
                 const bool codec_ok = self->audio_codec_ != nullptr &&
