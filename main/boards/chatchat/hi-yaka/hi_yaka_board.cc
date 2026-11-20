@@ -128,7 +128,7 @@ private:
 };
 
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
-void LogI2sPadEdges(const char* signal, gpio_num_t pin, uint32_t sample_us) {
+int LogI2sPadEdges(const char* signal, gpio_num_t pin, uint32_t sample_us) {
     pcnt_unit_config_t unit_config = {};
     unit_config.high_limit = 30000;
     unit_config.low_limit = -1;
@@ -183,6 +183,7 @@ void LogI2sPadEdges(const char* signal, gpio_num_t pin, uint32_t sample_us) {
     ESP_LOGI(TAG, "BRINGUP I2S pad edges: %s GPIO%d result=%s rising=%d elapsed_us=%lld",
              signal, static_cast<int>(pin), esp_err_to_name(result), rising_edges,
              static_cast<long long>(elapsed_us));
+    return result == ESP_OK ? rising_edges : -1;
 }
 
 class HiYaKaDiagnosticAudioCodec final : public BoxAudioCodec {
@@ -713,6 +714,35 @@ private:
                 bool read_failed = false;
                 bool write_failed = false;
                 bool enable_failed = false;
+                bool pull_failed = false;
+                struct PullPhaseStats {
+                    const char* name = nullptr;
+                    int rising_edges = -1;
+                    int level = -1;
+                    bool entered = false;
+                    uint64_t discarded_blocks = 0;
+                    std::vector<uint64_t> count;
+                    std::vector<uint64_t> varying;
+                    std::vector<int> minimum;
+                    std::vector<int> maximum;
+                    std::vector<int16_t> previous;
+                    std::vector<bool> previous_valid;
+                };
+                std::array<PullPhaseStats, 4> pull_phases;
+                constexpr std::array<gpio_pull_mode_t, 4> kPullModes = {
+                    GPIO_FLOATING, GPIO_PULLDOWN_ONLY, GPIO_PULLUP_ONLY, GPIO_FLOATING};
+                constexpr std::array<const char*, 4> kPullNames = {
+                    "float_before", "weak_down", "weak_up", "float_after"};
+                for (std::size_t phase = 0; phase < pull_phases.size(); ++phase) {
+                    auto& stats = pull_phases[phase];
+                    stats.name = kPullNames[phase];
+                    stats.count.assign(channels, 0);
+                    stats.varying.assign(channels, 0);
+                    stats.minimum.assign(channels, 32767);
+                    stats.maximum.assign(channels, -32768);
+                    stats.previous.assign(channels, 0);
+                    stats.previous_valid.assign(channels, false);
+                }
                 int64_t autotest_deadline_us = 0;
                 const bool wav_requested = self->storage_ != nullptr &&
                     self->storage_->ready();
@@ -747,15 +777,47 @@ private:
                         static_cast<uint64_t>(self->audio_codec_->input_sample_rate()) *
                         channels * kMaximumSeconds;
                     std::vector<int16_t> samples(kFramesPerChunk * channels, 0);
+                    const int64_t pull_start_us = esp_timer_get_time();
+                    int active_pull_phase = -1;
+                    int flush_blocks = 0;
                     while (!self->lab_record_stop_requested_.load() &&
                            samples_written < sample_limit) {
                         if (autotest && esp_timer_get_time() >= autotest_deadline_us) {
                             break;
                         }
+                        if (autotest) {
+                            const int64_t elapsed_us = esp_timer_get_time() - pull_start_us;
+                            const int next_phase = std::min<int>(3, elapsed_us / 900000);
+                            if (next_phase != active_pull_phase) {
+                                active_pull_phase = next_phase;
+                                const esp_err_t pull_result = gpio_set_pull_mode(
+                                    YAKA_AUDIO_DIN_GPIO, kPullModes[next_phase]);
+                                if (pull_result != ESP_OK) {
+                                    ESP_LOGE(TAG, "AUTOTEST_PULL phase=%s set_failed=%s",
+                                             kPullNames[next_phase], esp_err_to_name(pull_result));
+                                    pull_failed = true;
+                                    break;
+                                }
+                                vTaskDelay(pdMS_TO_TICKS(10));
+                                auto& stats = pull_phases[next_phase];
+                                stats.entered = true;
+                                stats.rising_edges = LogI2sPadEdges(
+                                    "SDOUT1_PHASE", YAKA_AUDIO_DIN_GPIO, 20000);
+                                stats.level = gpio_get_level(YAKA_AUDIO_DIN_GPIO);
+                                flush_blocks = 4;
+                                ESP_LOGI(TAG, "AUTOTEST_PULL phase=%s level=%d rising=%d flush_blocks=%d",
+                                         stats.name, stats.level, stats.rising_edges, flush_blocks);
+                            }
+                        }
                         if (!self->audio_codec_->InputData(samples)) {
                             read_failed = true;
                             ESP_LOGE(TAG, "BRINGUP MIC RECORD input read failed");
                             break;
+                        }
+                        if (autotest && flush_blocks > 0) {
+                            ++pull_phases[active_pull_phase].discarded_blocks;
+                            --flush_blocks;
+                            continue;
                         }
                         if (opened && !write_failed &&
                             !writer.Append(samples.data(), samples.size())) {
@@ -785,12 +847,44 @@ private:
                             channel_max[channel] = std::max(channel_max[channel], static_cast<int>(sample));
                             channel_sum_squares[channel] +=
                                 static_cast<uint64_t>(static_cast<int64_t>(sample) * sample);
+                            if (autotest) {
+                                auto& phase = pull_phases[active_pull_phase];
+                                ++phase.count[channel];
+                                phase.varying[channel] += phase.previous_valid[channel] &&
+                                    phase.previous[channel] != sample;
+                                phase.minimum[channel] = std::min(phase.minimum[channel],
+                                                                  static_cast<int>(sample));
+                                phase.maximum[channel] = std::max(phase.maximum[channel],
+                                                                  static_cast<int>(sample));
+                                phase.previous[channel] = sample;
+                                phase.previous_valid[channel] = true;
+                            }
                             previous_by_channel[channel] = sample;
                             previous_valid[channel] = true;
                         }
                         samples_written += samples.size();
                     }
                     self->audio_codec_->EnableInput(false);
+                    }
+                }
+                if (autotest) {
+                    const esp_err_t restore_pull = gpio_set_pull_mode(
+                        YAKA_AUDIO_DIN_GPIO, GPIO_FLOATING);
+                    ESP_LOGI(TAG, "AUTOTEST_PULL_RESTORE result=%s",
+                             esp_err_to_name(restore_pull));
+                    if (restore_pull != ESP_OK) pull_failed = true;
+                    for (const auto& phase : pull_phases) {
+                        for (std::size_t channel = 0; channel < channels; ++channel) {
+                            ESP_LOGI(TAG, "AUTOTEST_PULL_RESULT phase=%s entered=%d level=%d rising=%d discarded=%llu channel=%u samples=%llu min=%d max=%d varying=%llu",
+                                     phase.name, phase.entered, phase.level,
+                                     phase.rising_edges,
+                                     static_cast<unsigned long long>(phase.discarded_blocks),
+                                     static_cast<unsigned>(channel),
+                                     static_cast<unsigned long long>(phase.count[channel]),
+                                     phase.count[channel] ? phase.minimum[channel] : 0,
+                                     phase.count[channel] ? phase.maximum[channel] : 0,
+                                     static_cast<unsigned long long>(phase.varying[channel]));
+                        }
                     }
                 }
                 const bool closed = opened && writer.Close();
@@ -801,6 +895,7 @@ private:
                     all_minus_one = false;
                 }
                 const char* stop_reason = enable_failed ? "input_enable_failed" :
+                    pull_failed ? "pull_failed" :
                     read_failed ? "input_read_failed" :
                     self->lab_record_stop_requested_.load() ? "stop_request" :
                     autotest && esp_timer_get_time() >= autotest_deadline_us ?
