@@ -8,10 +8,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <esp_timer.h>
+#include <esp_rom_sys.h>
 
 #define TAG "BoxAudioCodec"
 
 namespace {
+constexpr int kEs7210MaxAttempts = 3;
+constexpr uint32_t kEs7210RetryDelayUs = 1500;
+
 struct CtrlFailure {
     uint32_t sequence;
     int64_t time_us;
@@ -19,6 +23,9 @@ struct CtrlFailure {
     int reg_len;
     int data_len;
     int result;
+    int final_result;
+    int attempt;
+    bool terminal;
     uint8_t value[4];
     bool write;
     bool blocked;
@@ -30,6 +37,8 @@ struct ObservedCtrl {
     uint8_t addr;
     uint32_t sequence;
     uint32_t failures;
+    uint32_t recovered_ops;
+    uint32_t terminal_ops;
     bool capture_active;
     bool read_fault_latched;
     CtrlFailure events[64];
@@ -40,7 +49,8 @@ ObservedCtrl* observed(const audio_codec_ctrl_if_t* base) {
 }
 
 void record_failure(ObservedCtrl* ctrl, bool write, bool blocked, int reg,
-                    int reg_len, const void* data, int data_len, int result) {
+                    int reg_len, const void* data, int data_len, int result,
+                    int attempt, bool terminal) {
     const uint32_t index = ctrl->failures++;
     if (index >= std::size(ctrl->events)) return;
     CtrlFailure& event = ctrl->events[index];
@@ -50,10 +60,22 @@ void record_failure(ObservedCtrl* ctrl, bool write, bool blocked, int reg,
     event.reg_len = reg_len;
     event.data_len = data_len;
     event.result = result;
+    event.final_result = result;
+    event.attempt = attempt;
+    event.terminal = terminal;
     event.write = write;
     event.blocked = blocked;
     if (data != nullptr && data_len > 0) {
         std::memcpy(event.value, data, std::min<int>(data_len, sizeof(event.value)));
+    }
+}
+
+void finalize_attempts(ObservedCtrl* ctrl, int final_result) {
+    const uint32_t count = std::min<uint32_t>(ctrl->failures, std::size(ctrl->events));
+    for (uint32_t i = 0; i < count; ++i) {
+        if (ctrl->events[i].sequence == ctrl->sequence) {
+            ctrl->events[i].final_result = final_result;
+        }
     }
 }
 
@@ -76,11 +98,24 @@ int observed_read(const audio_codec_ctrl_if_t* base, int reg, int reg_len,
         return ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
     }
     ++ctrl->sequence;
-    const int result = ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
-    if (result != ESP_CODEC_DEV_OK) {
-        record_failure(ctrl, false, false, reg, reg_len, nullptr, data_len, result);
-        ctrl->read_fault_latched = true;
+    int result = ESP_CODEC_DEV_READ_FAIL;
+    for (int attempt = 1; attempt <= kEs7210MaxAttempts; ++attempt) {
+        result = ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
+        if (result == ESP_CODEC_DEV_OK) {
+            if (attempt > 1) ++ctrl->recovered_ops;
+            break;
+        }
+        const bool terminal = attempt == kEs7210MaxAttempts;
+        record_failure(ctrl, false, false, reg, reg_len, nullptr, data_len,
+                       result, attempt, terminal);
+        if (terminal) {
+            ++ctrl->terminal_ops;
+            ctrl->read_fault_latched = true;
+        } else {
+            esp_rom_delay_us(kEs7210RetryDelayUs);
+        }
     }
+    finalize_attempts(ctrl, result);
     return result;
 }
 
@@ -93,13 +128,26 @@ int observed_write(const audio_codec_ctrl_if_t* base, int reg, int reg_len,
     ++ctrl->sequence;
     if (ctrl->read_fault_latched) {
         record_failure(ctrl, true, true, reg, reg_len, data, data_len,
-                       ESP_CODEC_DEV_WRITE_FAIL);
+                       ESP_CODEC_DEV_WRITE_FAIL, 0, true);
         return ESP_CODEC_DEV_WRITE_FAIL;
     }
-    const int result = ctrl->inner->write_reg(ctrl->inner, reg, reg_len, data, data_len);
-    if (result != ESP_CODEC_DEV_OK) {
-        record_failure(ctrl, true, false, reg, reg_len, data, data_len, result);
+    int result = ESP_CODEC_DEV_WRITE_FAIL;
+    for (int attempt = 1; attempt <= kEs7210MaxAttempts; ++attempt) {
+        result = ctrl->inner->write_reg(ctrl->inner, reg, reg_len, data, data_len);
+        if (result == ESP_CODEC_DEV_OK) {
+            if (attempt > 1) ++ctrl->recovered_ops;
+            break;
+        }
+        const bool terminal = attempt == kEs7210MaxAttempts;
+        record_failure(ctrl, true, false, reg, reg_len, data, data_len,
+                       result, attempt, terminal);
+        if (terminal) {
+            ++ctrl->terminal_ops;
+        } else {
+            esp_rom_delay_us(kEs7210RetryDelayUs);
+        }
     }
+    finalize_attempts(ctrl, result);
     return result;
 }
 
@@ -135,16 +183,21 @@ const audio_codec_ctrl_if_t* make_observed_ctrl(const audio_codec_ctrl_if_t* inn
 void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
     auto* ctrl = observed(base);
     ctrl->capture_active = false;
-    ESP_LOGI(TAG, "ES7210_CTRL_SUMMARY addr=0x%02x ops=%lu failures=%lu read_fault_guard=%d",
+    ESP_LOGI(TAG, "ES7210_CTRL_SUMMARY addr=0x%02x ops=%lu failed_attempts=%lu recovered_ops=%lu terminal_ops=%lu read_fault_guard=%d max_attempts=%d retry_delay_us=%lu",
              ctrl->addr, static_cast<unsigned long>(ctrl->sequence),
-             static_cast<unsigned long>(ctrl->failures), ctrl->read_fault_latched);
+             static_cast<unsigned long>(ctrl->failures),
+             static_cast<unsigned long>(ctrl->recovered_ops),
+             static_cast<unsigned long>(ctrl->terminal_ops), ctrl->read_fault_latched,
+             kEs7210MaxAttempts, static_cast<unsigned long>(kEs7210RetryDelayUs));
     const uint32_t count = std::min<uint32_t>(ctrl->failures, std::size(ctrl->events));
     for (uint32_t i = 0; i < count; ++i) {
         const auto& e = ctrl->events[i];
-        ESP_LOGW(TAG, "ES7210_CTRL_FAILURE seq=%lu t_us=%lld addr=0x%02x op=%s reg=0x%02x reg_len=%d data_len=%d value=%02x%02x%02x%02x ret=%d blocked=%d",
+        ESP_LOGW(TAG, "ES7210_CTRL_ATTEMPT seq=%lu t_us=%lld addr=0x%02x op=%s reg=0x%02x reg_len=%d data_len=%d value=%02x%02x%02x%02x ret=%d attempt=%d final_ret=%d recovered=%d terminal=%d blocked=%d",
                  static_cast<unsigned long>(e.sequence), static_cast<long long>(e.time_us),
                  ctrl->addr, e.write ? "write" : "read", e.reg, e.reg_len, e.data_len,
-                 e.value[0], e.value[1], e.value[2], e.value[3], e.result, e.blocked);
+                 e.value[0], e.value[1], e.value[2], e.value[3], e.result,
+                 e.attempt, e.final_result, e.final_result == ESP_CODEC_DEV_OK,
+                 e.terminal, e.blocked);
     }
     if (ctrl->failures > count) {
         ESP_LOGW(TAG, "ES7210_CTRL_FAILURE_OVERFLOW dropped=%lu",
