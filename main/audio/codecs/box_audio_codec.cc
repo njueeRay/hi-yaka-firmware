@@ -665,6 +665,67 @@ void BoxAudioCodec::EnableOutput(bool enable) {
     AudioCodec::EnableOutput(enable);
 }
 
+bool BoxAudioCodec::StartSilentOutputPrelude() {
+    std::lock_guard<std::mutex> lock(data_if_mutex_);
+    if (!graceful_init_failure_ || speaker_pa_enabled_ || !ready_ ||
+        output_dev_ == nullptr || silent_prelude_open_) {
+        ESP_LOGE(TAG, "silent prelude start rejected: ready=%d pa_enabled=%d open=%d",
+                 ready_, speaker_pa_enabled_, silent_prelude_open_);
+        return false;
+    }
+    esp_codec_dev_sample_info_t fs = {
+        .bits_per_sample = 16,
+        .channel = 1,
+        .channel_mask = 0,
+        .sample_rate = static_cast<uint32_t>(output_sample_rate_),
+        .mclk_multiple = 0,
+    };
+    begin_observed_ctrl(out_ctrl_if_);
+    const int open_result = esp_codec_dev_open(output_dev_, &fs);
+    const bool open_fault = observed_ctrl_faulted(out_ctrl_if_);
+    int volume_result = ESP_CODEC_DEV_WRONG_STATE;
+    if (open_result == ESP_CODEC_DEV_OK && !open_fault) {
+        volume_result = esp_codec_dev_set_out_vol(output_dev_, output_volume_);
+    }
+    const bool final_fault = observed_ctrl_faulted(out_ctrl_if_);
+    report_observed_ctrl(out_ctrl_if_);
+    ESP_LOGI(TAG, "D5_PRELUDE_OPEN ret=%d volume_ret=%d control_fault=%d",
+             open_result, volume_result, final_fault);
+    if (open_result != ESP_CODEC_DEV_OK || volume_result != ESP_CODEC_DEV_OK ||
+        final_fault) {
+        const int close_result = esp_codec_dev_close(output_dev_);
+        ESP_LOGW(TAG, "D5_PRELUDE_PARTIAL_CLOSE ret=%d (not hardware reset proof)",
+                 close_result);
+        return false;
+    }
+    silent_prelude_open_ = true;
+    return true;
+}
+
+bool BoxAudioCodec::WriteSilentOutputPrelude(const int16_t* samples, int count) {
+    std::lock_guard<std::mutex> lock(data_if_mutex_);
+    if (!silent_prelude_open_ || samples == nullptr || count != 960) return false;
+    const int result = esp_codec_dev_write(output_dev_,
+                                           const_cast<int16_t*>(samples),
+                                           count * sizeof(int16_t));
+    if (result != ESP_CODEC_DEV_OK) {
+        ESP_LOGE(TAG, "D5_PRELUDE_WRITE ret=%d samples=%d", result, count);
+    }
+    return result == ESP_CODEC_DEV_OK;
+}
+
+bool BoxAudioCodec::StopSilentOutputPrelude() {
+    std::lock_guard<std::mutex> lock(data_if_mutex_);
+    if (!silent_prelude_open_) return false;
+    begin_observed_ctrl(out_ctrl_if_);
+    const int close_result = esp_codec_dev_close(output_dev_);
+    const bool control_fault = observed_ctrl_faulted(out_ctrl_if_);
+    report_observed_ctrl(out_ctrl_if_);
+    silent_prelude_open_ = false;
+    ESP_LOGI(TAG, "D5_PRELUDE_CLOSE ret=%d control_fault=%d", close_result, control_fault);
+    return close_result == ESP_CODEC_DEV_OK && !control_fault;
+}
+
 int BoxAudioCodec::Read(int16_t* dest, int samples) {
     if (!input_enabled_ || dest == nullptr || samples <= 0) {
         return 0;

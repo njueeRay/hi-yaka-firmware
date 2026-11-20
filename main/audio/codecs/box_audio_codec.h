@@ -30,6 +30,7 @@ private:
     bool ready_ = false;
     bool tx_enabled_ = false;
     bool rx_enabled_ = false;
+    bool silent_prelude_open_ = false;
 
     bool CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout,
                               gpio_num_t din);
@@ -52,6 +53,12 @@ public:
     virtual ~BoxAudioCodec();
 
     bool ready() const { return ready_; }
+
+    // HiYaKa diagnostic only: keep PA disabled while exercising the digital
+    // output device before the delayed microphone capture.
+    bool StartSilentOutputPrelude();
+    bool WriteSilentOutputPrelude(const int16_t* samples, int count);
+    bool StopSilentOutputPrelude();
 
     virtual void SetOutputVolume(int volume) override;
     virtual void EnableInput(bool enable) override;

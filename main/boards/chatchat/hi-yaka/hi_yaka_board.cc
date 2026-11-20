@@ -258,6 +258,8 @@ private:
     std::atomic<bool> lab_record_autotest_{false};
     std::atomic<bool> lab_record_autotest_done_{false};
     std::atomic<bool> lab_record_autotest_wav_closed_{false};
+    std::atomic<bool> output_prelude_done_{false};
+    std::atomic<bool> output_prelude_valid_{false};
     uint32_t lab_record_sequence_ = 0;
 #endif
 
@@ -606,6 +608,68 @@ private:
         }
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+        const BaseType_t prelude_task = xTaskCreate([](void* context) {
+            auto* self = static_cast<HiYaKaBoard*>(context);
+            constexpr int64_t kOpenAtUs = 4300000;
+            constexpr int64_t kCloseAtUs = 21300000;
+            const int64_t wait_us = kOpenAtUs - esp_timer_get_time();
+            if (wait_us > 0) {
+                vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(wait_us / 1000)));
+            }
+            const int64_t open_at_us = esp_timer_get_time();
+            const bool pa_low_at_open =
+                gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
+            if (!pa_low_at_open) {
+                self->ForcePaDisabled();
+                self->output_prelude_done_.store(true);
+                ESP_LOGE(TAG, "D5_PRELUDE_RESULT pa_high_at_open uptime_ms=%lld valid=0",
+                         static_cast<long long>(open_at_us / 1000));
+                vTaskDelete(nullptr);
+                return;
+            }
+            bool opened = false;
+            bool wrote = false;
+            bool closed = false;
+            if (pa_low_at_open && self->audio_codec_ != nullptr) {
+                opened = self->audio_codec_->StartSilentOutputPrelude();
+                if (opened) {
+                    const std::array<int16_t, 960> silence{};
+                    wrote = self->audio_codec_->WriteSilentOutputPrelude(
+                        silence.data(), static_cast<int>(silence.size()));
+                }
+            }
+            const int64_t remaining_us = kCloseAtUs - esp_timer_get_time();
+            if (remaining_us > 0) {
+                vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(remaining_us / 1000)));
+            }
+            const bool pa_low_at_close =
+                gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
+            if (!pa_low_at_close) self->ForcePaDisabled();
+            if (opened) {
+                closed = self->audio_codec_->StopSilentOutputPrelude();
+            }
+            const int64_t close_at_us = esp_timer_get_time();
+            const bool valid = opened && wrote && closed &&
+                               pa_low_at_open && pa_low_at_close &&
+                               open_at_us >= 4000000 && open_at_us <= 6000000 &&
+                               close_at_us >= 20000000 && close_at_us <= 23000000;
+            self->output_prelude_valid_.store(valid);
+            self->output_prelude_done_.store(true);
+            ESP_LOGI(TAG, "D5_PRELUDE_RESULT open_uptime_ms=%lld close_uptime_ms=%lld "
+                     "open=%d samples_written=%u close=%d pa_open_low=%d pa_close_low=%d "
+                     "valid=%d (digital silence; no speaker playback)",
+                     static_cast<long long>(open_at_us / 1000),
+                     static_cast<long long>(close_at_us / 1000),
+                     opened, wrote ? 960U : 0U, closed, pa_low_at_open,
+                     pa_low_at_close, valid);
+            vTaskDelete(nullptr);
+        }, "hi_yaka_d5_output", 8192, this, 3, nullptr);
+        if (prelude_task != pdPASS) {
+            output_prelude_done_.store(true);
+            ESP_LOGE(TAG, "D5_PRELUDE_RESULT task_create_failed valid=0");
+        }
+#endif
 #if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS || CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS
         audio_codec_->EnableInput(true);
         vTaskDelay(pdMS_TO_TICKS(150));
@@ -1052,11 +1116,14 @@ private:
                                    self->recording_store_ != nullptr;
                 const bool feedback_ok = self->feedback_ != nullptr;
                 const bool pa_low = gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
-                const bool allowed = pca_ok && codec_ok && feedback_ok && pa_low;
+                const bool prelude_ok = self->output_prelude_done_.load() &&
+                                        self->output_prelude_valid_.load();
+                const bool allowed = pca_ok && codec_ok && feedback_ok && pa_low && prelude_ok;
                 ESP_LOGI(TAG, "AUTOTEST_GATE pca=%d codec=%d channels=%u tf=%d "
-                         "feedback=%d pa_low=%d allowed=%d", pca_ok, codec_ok,
+                         "feedback=%d pa_low=%d prelude_done=%d prelude_valid=%d allowed=%d", pca_ok, codec_ok,
                          codec_ok ? static_cast<unsigned>(self->audio_codec_->input_channels()) : 0,
-                         tf_ok, feedback_ok, pa_low, allowed);
+                         tf_ok, feedback_ok, pa_low,
+                         self->output_prelude_done_.load(), prelude_ok, allowed);
                 if (allowed) {
                     Application::GetInstance().Schedule([self]() {
                         const bool still_safe = self->pca_safe_state_verified_ &&
@@ -1065,6 +1132,8 @@ private:
                             self->audio_codec_->input_channels() > 0 &&
                             self->audio_codec_->input_sample_rate() > 0 &&
                             self->feedback_ != nullptr &&
+                            self->output_prelude_done_.load() &&
+                            self->output_prelude_valid_.load() &&
                             gpio_get_level(YAKA_AUDIO_PA_ENABLE_GPIO) == 0;
                         if (!still_safe || self->lab_record_active_.load()) {
                             ESP_LOGE(TAG, "AUTOTEST_START skipped: gate=%d active=%d",
