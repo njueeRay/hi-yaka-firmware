@@ -185,6 +185,95 @@ void LogI2sPadEdges(const char* signal, gpio_num_t pin, uint32_t sample_us) {
              static_cast<long long>(elapsed_us));
 }
 
+void LogEs7210ReadbackCrosscheck(i2c_master_bus_handle_t bus) {
+    if (bus == nullptr) {
+        ESP_LOGE(TAG, "D4_READBACK skipped: I2C bus unavailable");
+        return;
+    }
+    i2c_device_config_t cfg = {};
+    cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    cfg.device_address = YAKA_ES7210_I2C_ADDRESS;
+    cfg.scl_speed_hz = 100000;
+    i2c_master_dev_handle_t combined = nullptr;
+    i2c_master_dev_handle_t split = nullptr;
+    esp_err_t combined_add = i2c_master_bus_add_device(bus, &cfg, &combined);
+    cfg.scl_speed_hz = 25000;
+    esp_err_t split_add = i2c_master_bus_add_device(bus, &cfg, &split);
+    if (combined_add != ESP_OK || split_add != ESP_OK) {
+        ESP_LOGE(TAG, "D4_READBACK device setup combined=%s split=%s",
+                 esp_err_to_name(combined_add), esp_err_to_name(split_add));
+        if (combined != nullptr) i2c_master_bus_rm_device(combined);
+        if (split != nullptr) i2c_master_bus_rm_device(split);
+        return;
+    }
+    constexpr std::array<uint8_t, 5> kRegs = {0x3D, 0x3E, 0x0B, 0x11, 0x12};
+    struct ReadResult {
+        esp_err_t error = ESP_ERR_INVALID_STATE;
+        const char* stage = "not_run";
+        uint8_t value = 0;
+        int64_t time_us = 0;
+    };
+    std::array<std::array<std::array<ReadResult, kRegs.size()>, 2>, 2> results{};
+    for (int round = 0; round < 2; ++round) {
+        for (int order = 0; order < 2; ++order) {
+            const int method = round == 0 ? order : 1 - order;
+            const auto handle = method == 0 ? combined : split;
+            for (std::size_t index = 0; index < kRegs.size(); ++index) {
+                auto& result = results[round][method][index];
+                const uint8_t reg = kRegs[index];
+                result.time_us = esp_timer_get_time();
+                if (method == 0) {
+                    result.stage = "combined";
+                    result.error = i2c_master_transmit_receive(
+                        handle, &reg, 1, &result.value, 1, 20);
+                } else {
+                    result.stage = "pointer";
+                    result.error = i2c_master_transmit(handle, &reg, 1, 20);
+                    if (result.error == ESP_OK) {
+                        result.stage = "receive";
+                        result.error = i2c_master_receive(handle, &result.value, 1, 20);
+                    }
+                }
+            }
+        }
+    }
+    for (int round = 0; round < 2; ++round) {
+        for (int method = 0; method < 2; ++method) {
+            const auto& row = results[round][method];
+            const bool id_valid = row[0].error == ESP_OK && row[0].value == 0x72 &&
+                                  row[1].error == ESP_OK && row[1].value == 0x10;
+            ESP_LOGI(TAG, "D4_READBACK_GROUP round=%d method=%s id_valid=%d",
+                     round, method == 0 ? "100k_combined" : "25k_split", id_valid);
+            for (std::size_t index = 0; index < kRegs.size(); ++index) {
+                const auto& result = row[index];
+                ESP_LOGI(TAG, "D4_READBACK round=%d method=%s reg=0x%02x stage=%s ret=%s value_valid=%d value=0x%02x t_us=%lld",
+                         round, method == 0 ? "100k_combined" : "25k_split",
+                         kRegs[index], result.stage, esp_err_to_name(result.error),
+                         result.error == ESP_OK, result.value,
+                         static_cast<long long>(result.time_us));
+            }
+        }
+    }
+    for (int method = 0; method < 2; ++method) {
+        const auto& first = results[0][method];
+        const auto& second = results[1][method];
+        const bool ids_valid = first[0].error == ESP_OK && first[0].value == 0x72 &&
+            first[1].error == ESP_OK && first[1].value == 0x10 &&
+            second[0].error == ESP_OK && second[0].value == 0x72 &&
+            second[1].error == ESP_OK && second[1].value == 0x10;
+        const bool status_consistent = first[2].error == ESP_OK &&
+            second[2].error == ESP_OK && first[2].value == second[2].value;
+        ESP_LOGI(TAG, "D4_READBACK_SUMMARY method=%s ids_valid_both=%d status_consistent=%d status=0x%02x candidate_authentic=%d",
+                 method == 0 ? "100k_combined" : "25k_split",
+                 ids_valid, status_consistent, first[2].value,
+                 ids_valid && status_consistent);
+    }
+    const esp_err_t split_remove = i2c_master_bus_rm_device(split);
+    const esp_err_t combined_remove = i2c_master_bus_rm_device(combined);
+    ESP_LOGI(TAG, "D4_READBACK_CLEANUP combined=%s split=%s",
+             esp_err_to_name(combined_remove), esp_err_to_name(split_remove));
+}
+
 class HiYaKaDiagnosticAudioCodec final : public BoxAudioCodec {
 public:
     using BoxAudioCodec::BoxAudioCodec;
@@ -789,6 +878,16 @@ private:
                             previous_valid[channel] = true;
                         }
                         samples_written += samples.size();
+                    }
+                    if (autotest) {
+                        const bool input_active = self->audio_codec_->input_enabled();
+                        ESP_LOGI(TAG, "D4_READBACK_GATE input_enabled=%d before_input_close=1",
+                                 input_active);
+                        if (input_active) {
+                            LogI2sPadEdges("D4_MCLK", YAKA_AUDIO_MCLK_GPIO, 1000);
+                            LogI2sPadEdges("D4_WS", YAKA_AUDIO_WS_GPIO, 20000);
+                            LogEs7210ReadbackCrosscheck(self->i2c_bus_);
+                        }
                     }
                     self->audio_codec_->EnableInput(false);
                     }
