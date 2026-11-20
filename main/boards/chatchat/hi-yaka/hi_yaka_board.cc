@@ -502,11 +502,12 @@ private:
             return i2c_master_receive(device, value, 1, 100);
         };
 
+        int valid_windows = 0;
         bool verified = false;
         for (int attempt = 0; attempt < 5 && !verified; ++attempt) {
             uint8_t primer_value = 0;
             const esp_err_t primer_result = read_register(first_reg, &primer_value);
-            bool both_rounds_match = true;
+            bool window_match = false;
             esp_err_t first_results[2] = {};
             esp_err_t second_results[2] = {};
             uint8_t first_ids[2] = {};
@@ -518,18 +519,22 @@ private:
                                    second_results[round] == ESP_OK &&
                                    first_ids[round] == first_expected &&
                                    second_ids[round] == second_expected;
-                both_rounds_match = both_rounds_match && match;
+                window_match = window_match || match;
             }
+            if (window_match) {
+                ++valid_windows;
+            }
+            verified = valid_windows >= 2;
             ESP_LOGI(TAG,
                      "%s identity attempt=%d/5 primer=%s rounds="
-                     "[%s:0x%02X,%s:0x%02X][%s:0x%02X,%s:0x%02X] match=%d",
+                     "[%s:0x%02X,%s:0x%02X][%s:0x%02X,%s:0x%02X] "
+                     "window_match=%d valid_windows=%d/2",
                      name, attempt + 1, esp_err_to_name(primer_result),
                      esp_err_to_name(first_results[0]), first_ids[0],
                      esp_err_to_name(second_results[0]), second_ids[0],
                      esp_err_to_name(first_results[1]), first_ids[1],
                      esp_err_to_name(second_results[1]), second_ids[1],
-                     both_rounds_match);
-            verified = both_rounds_match;
+                     window_match, valid_windows);
             if (!verified && attempt < 4) {
                 vTaskDelay(pdMS_TO_TICKS(25));
             }
@@ -549,8 +554,8 @@ private:
         ESP_LOGI(TAG, "audio address observations: ES8311=%s ES7210=%s",
                  esp_err_to_name(output_probe), esp_err_to_name(input_probe));
 
-        // Address ACK can be false or can identify a different device. Only
-        // two consecutive correct ID read pairs authorize codec construction.
+        // Address ACK can be false or can identify a different device. Require
+        // a complete ID pair in two separate windows before codec construction.
         const bool output_identity = VerifyAudioIdentity(
             YAKA_ES8311_I2C_ADDRESS, "ES8311", YAKA_I2C_FREQUENCY_HZ, false,
             0xFD, 0x83, 0xFE, 0x11);
