@@ -5,8 +5,153 @@
 #include <driver/i2s_tdm.h>
 #include <algorithm>
 #include <array>
+#include <cstdlib>
+#include <cstring>
+#include <esp_timer.h>
 
 #define TAG "BoxAudioCodec"
+
+namespace {
+struct CtrlFailure {
+    uint32_t sequence;
+    int64_t time_us;
+    int reg;
+    int reg_len;
+    int data_len;
+    int result;
+    uint8_t value[4];
+    bool write;
+    bool blocked;
+};
+
+struct ObservedCtrl {
+    audio_codec_ctrl_if_t base;
+    const audio_codec_ctrl_if_t* inner;
+    uint8_t addr;
+    uint32_t sequence;
+    uint32_t failures;
+    bool capture_active;
+    bool read_fault_latched;
+    CtrlFailure events[64];
+};
+
+ObservedCtrl* observed(const audio_codec_ctrl_if_t* base) {
+    return reinterpret_cast<ObservedCtrl*>(const_cast<audio_codec_ctrl_if_t*>(base));
+}
+
+void record_failure(ObservedCtrl* ctrl, bool write, bool blocked, int reg,
+                    int reg_len, const void* data, int data_len, int result) {
+    const uint32_t index = ctrl->failures++;
+    if (index >= std::size(ctrl->events)) return;
+    CtrlFailure& event = ctrl->events[index];
+    event.sequence = ctrl->sequence;
+    event.time_us = esp_timer_get_time();
+    event.reg = reg;
+    event.reg_len = reg_len;
+    event.data_len = data_len;
+    event.result = result;
+    event.write = write;
+    event.blocked = blocked;
+    if (data != nullptr && data_len > 0) {
+        std::memcpy(event.value, data, std::min<int>(data_len, sizeof(event.value)));
+    }
+}
+
+int observed_open(const audio_codec_ctrl_if_t* base, void* cfg, int cfg_size) {
+    auto* ctrl = observed(base);
+    if (ctrl->inner == nullptr) return ESP_CODEC_DEV_WRONG_STATE;
+    if (ctrl->inner->is_open(ctrl->inner)) return ESP_CODEC_DEV_OK;
+    return ctrl->inner->open(ctrl->inner, cfg, cfg_size);
+}
+
+bool observed_is_open(const audio_codec_ctrl_if_t* base) {
+    const auto* ctrl = observed(base);
+    return ctrl->inner != nullptr && ctrl->inner->is_open(ctrl->inner);
+}
+
+int observed_read(const audio_codec_ctrl_if_t* base, int reg, int reg_len,
+                  void* data, int data_len) {
+    auto* ctrl = observed(base);
+    if (!ctrl->capture_active) {
+        return ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
+    }
+    ++ctrl->sequence;
+    const int result = ctrl->inner->read_reg(ctrl->inner, reg, reg_len, data, data_len);
+    if (result != ESP_CODEC_DEV_OK) {
+        record_failure(ctrl, false, false, reg, reg_len, nullptr, data_len, result);
+        ctrl->read_fault_latched = true;
+    }
+    return result;
+}
+
+int observed_write(const audio_codec_ctrl_if_t* base, int reg, int reg_len,
+                   void* data, int data_len) {
+    auto* ctrl = observed(base);
+    if (!ctrl->capture_active) {
+        return ctrl->inner->write_reg(ctrl->inner, reg, reg_len, data, data_len);
+    }
+    ++ctrl->sequence;
+    if (ctrl->read_fault_latched) {
+        record_failure(ctrl, true, true, reg, reg_len, data, data_len,
+                       ESP_CODEC_DEV_WRITE_FAIL);
+        return ESP_CODEC_DEV_WRITE_FAIL;
+    }
+    const int result = ctrl->inner->write_reg(ctrl->inner, reg, reg_len, data, data_len);
+    if (result != ESP_CODEC_DEV_OK) {
+        record_failure(ctrl, true, false, reg, reg_len, data, data_len, result);
+    }
+    return result;
+}
+
+int observed_get_info(const audio_codec_ctrl_if_t* base, audio_codec_ctrl_info_t* info) {
+    auto* ctrl = observed(base);
+    return ctrl->inner->get_info(ctrl->inner, info);
+}
+
+int observed_close(const audio_codec_ctrl_if_t* base) {
+    auto* ctrl = observed(base);
+    if (ctrl->inner == nullptr) return ESP_CODEC_DEV_OK;
+    const int result = audio_codec_delete_ctrl_if(ctrl->inner);
+    ctrl->inner = nullptr;
+    return result;
+}
+
+const audio_codec_ctrl_if_t* make_observed_ctrl(const audio_codec_ctrl_if_t* inner,
+                                                uint8_t addr) {
+    auto* ctrl = static_cast<ObservedCtrl*>(std::calloc(1, sizeof(ObservedCtrl)));
+    if (ctrl == nullptr) return nullptr;
+    ctrl->inner = inner;
+    ctrl->addr = addr;
+    ctrl->capture_active = true;
+    ctrl->base.open = observed_open;
+    ctrl->base.is_open = observed_is_open;
+    ctrl->base.read_reg = observed_read;
+    ctrl->base.write_reg = observed_write;
+    ctrl->base.get_info = observed_get_info;
+    ctrl->base.close = observed_close;
+    return &ctrl->base;
+}
+
+void report_observed_ctrl(const audio_codec_ctrl_if_t* base) {
+    auto* ctrl = observed(base);
+    ctrl->capture_active = false;
+    ESP_LOGI(TAG, "ES7210_CTRL_SUMMARY addr=0x%02x ops=%lu failures=%lu read_fault_guard=%d",
+             ctrl->addr, static_cast<unsigned long>(ctrl->sequence),
+             static_cast<unsigned long>(ctrl->failures), ctrl->read_fault_latched);
+    const uint32_t count = std::min<uint32_t>(ctrl->failures, std::size(ctrl->events));
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto& e = ctrl->events[i];
+        ESP_LOGW(TAG, "ES7210_CTRL_FAILURE seq=%lu t_us=%lld addr=0x%02x op=%s reg=0x%02x reg_len=%d data_len=%d value=%02x%02x%02x%02x ret=%d blocked=%d",
+                 static_cast<unsigned long>(e.sequence), static_cast<long long>(e.time_us),
+                 ctrl->addr, e.write ? "write" : "read", e.reg, e.reg_len, e.data_len,
+                 e.value[0], e.value[1], e.value[2], e.value[3], e.result, e.blocked);
+    }
+    if (ctrl->failures > count) {
+        ESP_LOGW(TAG, "ES7210_CTRL_FAILURE_OVERFLOW dropped=%lu",
+                 static_cast<unsigned long>(ctrl->failures - count));
+    }
+}
+}  // namespace
 
 BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int output_sample_rate,
                              gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout,
@@ -97,7 +242,13 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
 
     // Input
     i2c_cfg.addr = es7210_addr;
-    in_ctrl_if_ = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    const auto* es7210_inner_ctrl = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    if (es7210_inner_ctrl != nullptr && graceful_init_failure_) {
+        in_ctrl_if_ = make_observed_ctrl(es7210_inner_ctrl, es7210_addr);
+        if (in_ctrl_if_ == nullptr) audio_codec_delete_ctrl_if(es7210_inner_ctrl);
+    } else {
+        in_ctrl_if_ = es7210_inner_ctrl;
+    }
     if (in_ctrl_if_ == nullptr) {
         fail("ES7210 I2C control interface");
         return;
@@ -107,6 +258,7 @@ BoxAudioCodec::BoxAudioCodec(void* i2c_master_handle, int input_sample_rate, int
     es7210_cfg.ctrl_if = in_ctrl_if_;
     es7210_cfg.mic_selected = es7210_mic_mask;
     in_codec_if_ = es7210_codec_new(&es7210_cfg);
+    if (graceful_init_failure_) report_observed_ctrl(in_ctrl_if_);
     if (in_codec_if_ == nullptr) {
         fail("ES7210 codec open");
         return;
