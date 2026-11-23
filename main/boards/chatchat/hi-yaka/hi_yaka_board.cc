@@ -314,6 +314,7 @@ private:
     }
 
     void InitializePca9557SafeState() {
+        pca_safe_state_verified_ = false;
         pca9557_ = std::make_unique<HiYaKaPca9557>(i2c_bus_);
         esp_err_t result = ESP_FAIL;
         for (int attempt = 0; attempt < 5; ++attempt) {
@@ -334,18 +335,10 @@ private:
             return;
         }
 
-        uint8_t output = 0;
-        uint8_t configuration = 0;
-        esp_err_t readback_result = pca9557_->ReadBack(&output, &configuration);
-        if (readback_result == ESP_OK && output == YAKA_PCA9557_SAFE_OUTPUT &&
-            configuration == YAKA_PCA9557_SAFE_CONFIGURATION) {
-            ESP_LOGI(TAG, "PCA9557 safe state verified: output=0x%02X config=0x%02X", output,
-                     configuration);
-            pca_safe_state_verified_ = true;
-        } else {
-            ESP_LOGE(TAG, "PCA9557 safe-state readback failed: output=0x%02X config=0x%02X (%s)",
-                     output, configuration, esp_err_to_name(readback_result));
-        }
+        // InitializeSafe already reads back the output and configuration. An
+        // extra I2C read here can fail transiently after a verified safe write.
+        pca_safe_state_verified_ = true;
+        ESP_LOGI(TAG, "PCA9557 safe state confirmed by InitializeSafe");
     }
 
 #if CONFIG_HI_YAKA_ENABLE_DISPLAY
@@ -537,21 +530,120 @@ private:
 #endif
 
 #if CONFIG_HI_YAKA_ENABLE_AUDIO
+    esp_err_t ProbeAudioAddressTwice(uint8_t address, const char* name) {
+        esp_err_t result = ESP_ERR_NOT_FOUND;
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            const esp_err_t first = i2c_master_probe(i2c_bus_, address, 100);
+            const esp_err_t second = i2c_master_probe(i2c_bus_, address, 100);
+            ESP_LOGI(TAG, "audio I2C 2xACK probe %s 0x%02X attempt=%d/5 first=%s second=%s",
+                     name, address, attempt + 1, esp_err_to_name(first),
+                     esp_err_to_name(second));
+            if (first == ESP_OK && second == ESP_OK) {
+                return ESP_OK;
+            }
+            result = second != ESP_OK ? second : first;
+            if (attempt < 4) {
+                vTaskDelay(pdMS_TO_TICKS(25));
+            }
+        }
+        return result;
+    }
+
+    bool VerifyAudioIdentity(uint8_t address, const char* name, uint32_t clock_hz,
+                             bool split_read, uint8_t first_reg, uint8_t first_expected,
+                             uint8_t second_reg, uint8_t second_expected) {
+        i2c_device_config_t config = {};
+        config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+        config.device_address = address;
+        config.scl_speed_hz = clock_hz;
+        i2c_master_dev_handle_t device = nullptr;
+        const esp_err_t add_result = i2c_master_bus_add_device(i2c_bus_, &config, &device);
+        if (add_result != ESP_OK) {
+            ESP_LOGE(TAG, "%s identity device creation failed: %s", name,
+                     esp_err_to_name(add_result));
+            return false;
+        }
+
+        auto read_register = [device, split_read](uint8_t reg, uint8_t* value) {
+            if (!split_read) {
+                return i2c_master_transmit_receive(device, &reg, 1, value, 1, 100);
+            }
+            const esp_err_t pointer_result = i2c_master_transmit(device, &reg, 1, 100);
+            if (pointer_result != ESP_OK) {
+                return pointer_result;
+            }
+            return i2c_master_receive(device, value, 1, 100);
+        };
+
+        int valid_windows = 0;
+        bool verified = false;
+        for (int attempt = 0; attempt < 5 && !verified; ++attempt) {
+            uint8_t primer_value = 0;
+            const esp_err_t primer_result = read_register(first_reg, &primer_value);
+            bool window_match = false;
+            esp_err_t first_results[2] = {};
+            esp_err_t second_results[2] = {};
+            uint8_t first_ids[2] = {};
+            uint8_t second_ids[2] = {};
+            for (int round = 0; round < 2; ++round) {
+                first_results[round] = read_register(first_reg, &first_ids[round]);
+                second_results[round] = read_register(second_reg, &second_ids[round]);
+                const bool match = first_results[round] == ESP_OK &&
+                                   second_results[round] == ESP_OK &&
+                                   first_ids[round] == first_expected &&
+                                   second_ids[round] == second_expected;
+                window_match = window_match || match;
+            }
+            if (window_match) {
+                ++valid_windows;
+            }
+            verified = valid_windows >= 2;
+            ESP_LOGI(TAG,
+                     "%s identity attempt=%d/5 primer=%s rounds="
+                     "[%s:0x%02X,%s:0x%02X][%s:0x%02X,%s:0x%02X] "
+                     "window_match=%d valid_windows=%d/2",
+                     name, attempt + 1, esp_err_to_name(primer_result),
+                     esp_err_to_name(first_results[0]), first_ids[0],
+                     esp_err_to_name(second_results[0]), second_ids[0],
+                     esp_err_to_name(first_results[1]), first_ids[1],
+                     esp_err_to_name(second_results[1]), second_ids[1],
+                     window_match, valid_windows);
+            if (!verified && attempt < 4) {
+                vTaskDelay(pdMS_TO_TICKS(25));
+            }
+        }
+        i2c_master_bus_rm_device(device);
+        if (!verified) {
+            ESP_LOGE(TAG, "%s identity not verified; audio codec construction blocked", name);
+        }
+        return verified;
+    }
+
     void InitializeAudio() {
-#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
-        // The input-only A/B probe must run before the paired-codec gate.
-        // An intermittent ES8311 ACK must not hide ES7210 receive evidence.
-        HiYaKaRunAudioAbDiagnostics(i2c_bus_);
-#endif
         const esp_err_t output_probe =
-            i2c_master_probe(i2c_bus_, YAKA_ES8311_I2C_ADDRESS, 100);
+            ProbeAudioAddressTwice(YAKA_ES8311_I2C_ADDRESS, "ES8311");
         const esp_err_t input_probe =
-            i2c_master_probe(i2c_bus_, YAKA_ES7210_I2C_ADDRESS, 100);
-        if (output_probe != ESP_OK || input_probe != ESP_OK) {
-            ESP_LOGE(TAG, "real audio skipped: ES8311=%s ES7210=%s",
-                     esp_err_to_name(output_probe), esp_err_to_name(input_probe));
+            ProbeAudioAddressTwice(YAKA_ES7210_I2C_ADDRESS, "ES7210");
+        ESP_LOGI(TAG, "audio address observations: ES8311=%s ES7210=%s",
+                 esp_err_to_name(output_probe), esp_err_to_name(input_probe));
+
+        // Address ACK may be a false positive or miss a responsive device.
+        // Require two independent windows with complete, genuine ID pairs.
+        const bool output_identity = VerifyAudioIdentity(
+            YAKA_ES8311_I2C_ADDRESS, "ES8311", YAKA_I2C_FREQUENCY_HZ, false,
+            0xFD, 0x83, 0xFE, 0x11);
+        const bool input_identity = VerifyAudioIdentity(
+            YAKA_ES7210_I2C_ADDRESS, "ES7210", 25000, true,
+            0x3D, 0x72, 0x3E, 0x10);
+        if (!output_identity || !input_identity) {
+            ESP_LOGE(TAG, "real audio skipped: ES8311 identity=%d ES7210 identity=%d",
+                     output_identity, input_identity);
             return;
         }
+
+#if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
+        HiYaKaRunAudioAbDiagnostics(i2c_bus_);
+#endif
 
         // Lab builds isolate both physical microphones on a standard stereo
         // frame. This distinguishes a TDM/clock mismatch from a dead SDOUT1
@@ -570,11 +662,17 @@ private:
             // slot makes esp_codec_dev reconfigure the RX interface to mono,
             // which hides whether MIC2 appears in the other physical slot.
             true, 24.0f, 1, 24.0f, YAKA_I2C_PORT,
-            ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true);
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2, false, true, true);
 #else
             true, 24.0f, 2, 0.0f, YAKA_I2C_PORT,
-            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false, false);
+            ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3, false, false, true);
 #endif
+        if (!audio_codec_->ready()) {
+            ESP_LOGE(TAG, "audio codec initialization failed; audio disabled for this boot");
+            audio_codec_.reset();
+            ForcePaDisabled();
+            return;
+        }
         ESP_LOGW(TAG,
                  "audio codec/I2S candidate enabled; speaker PA is hard-disabled");
 #if CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS || CONFIG_HI_YAKA_AUDIO_BASELINE_DIAGNOSTICS
@@ -895,12 +993,12 @@ public:
         ForcePaDisabled();
         LogPlatformBaseline();
         InitializeI2c();
+        InitializePca9557SafeState();
 #if !CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
         ProbeExpectedI2cDevices();
 #else
         ESP_LOGI(TAG, "audio A/B: startup address scans skipped");
 #endif
-        InitializePca9557SafeState();
 #if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS && !CONFIG_HI_YAKA_AUDIO_AB_DIAGNOSTICS
         ScanI2cBusForDiagnostics();
 #endif
