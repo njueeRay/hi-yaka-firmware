@@ -10,7 +10,6 @@
 #include <driver/parlio_tx.h>
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
 #include <driver/gpio.h>
-#include <esp_rom_sys.h>
 #endif
 #include <esp_heap_caps.h>
 #include <esp_lcd_panel_commands.h>
@@ -75,14 +74,14 @@ esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
 
     const auto* source = static_cast<const uint8_t*>(data);
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
-    // Mode 0: the module latches SDA on SCL's rising edge. The 1 us holds
-    // make this an independent, deliberately slow reference transport.
+    // ST7789V latches SDA on SCL's rising edge. Three separate gpio_set_level
+    // calls per bit preserve data-before-clock ordering. Function-call and
+    // loop overhead is expected to exceed the panel's 10 ns data setup,
+    // 15 ns SCL high/low and 66 ns cycle minima; pad timing is not measured.
     for (size_t index = 0; index < size; ++index) {
         for (int bit = 7; bit >= 0; --bit) {
             gpio_set_level(YAKA_LCD_MOSI_GPIO, (source[index] >> bit) & 1U);
-            esp_rom_delay_us(1);
             gpio_set_level(YAKA_LCD_SCLK_GPIO, 1);
-            esp_rom_delay_us(1);
             gpio_set_level(YAKA_LCD_SCLK_GPIO, 0);
         }
     }

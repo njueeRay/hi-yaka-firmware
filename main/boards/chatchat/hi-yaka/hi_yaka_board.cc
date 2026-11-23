@@ -433,20 +433,29 @@ private:
                 std::fill_n(test_pixels, YAKA_LCD_VIEW_WIDTH * kRowsPerTransfer,
                             kTestColors[color_index]);
                 esp_err_t draw_result = ESP_OK;
+                size_t drawn_rows = 0;
+                const int64_t draw_started_us = esp_timer_get_time();
                 for (int y = 0; y < YAKA_LCD_VIEW_HEIGHT;
                      y += static_cast<int>(kRowsPerTransfer)) {
+                    const int next_y = std::min(
+                        y + static_cast<int>(kRowsPerTransfer),
+                        YAKA_LCD_VIEW_HEIGHT);
                     draw_result = esp_lcd_panel_draw_bitmap(
-                        panel, 0, y, YAKA_LCD_VIEW_WIDTH,
-                        std::min(y + static_cast<int>(kRowsPerTransfer),
-                                 YAKA_LCD_VIEW_HEIGHT),
-                        test_pixels);
+                        panel, 0, y, YAKA_LCD_VIEW_WIDTH, next_y, test_pixels);
                     if (draw_result != ESP_OK) {
                         break;
                     }
+                    drawn_rows += static_cast<size_t>(next_y - y);
                 }
-                ESP_LOGI(TAG, "LCD color test %s: %s",
-                         kColorNames[color_index],
-                         esp_err_to_name(draw_result));
+                const int64_t draw_elapsed_us =
+                    esp_timer_get_time() - draw_started_us;
+                ESP_LOGI(TAG,
+                         "LCD color test %s: %s rows=%u bytes=%u draw_us=%lld",
+                         kColorNames[color_index], esp_err_to_name(draw_result),
+                         static_cast<unsigned>(drawn_rows),
+                         static_cast<unsigned>(drawn_rows * YAKA_LCD_VIEW_WIDTH *
+                                               sizeof(uint16_t)),
+                         static_cast<long long>(draw_elapsed_us));
                 vTaskDelay(pdMS_TO_TICKS(1500));
             }
             free(test_pixels);
