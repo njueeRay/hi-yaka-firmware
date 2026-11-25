@@ -23,8 +23,15 @@ private:
     std::mutex data_if_mutex_;
     int reference_gain_channel_ = -1;
     float reference_gain_ = 0.0f;
+    bool speaker_pa_enabled_ = true;
+    bool std_stereo_input_ = false;
+    bool digital_output_observed_ = false;
+    bool graceful_init_failure_ = false;
+    bool ready_ = false;
+    bool tx_enabled_ = false;
+    bool rx_enabled_ = false;
 
-    void CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout,
+    bool CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout,
                               gpio_num_t din);
 
     virtual int Read(int16_t* dest, int samples) override;
@@ -38,12 +45,21 @@ public:
                   float reference_gain = 0.0f,
                   i2c_port_t i2c_port = static_cast<i2c_port_t>(1),
                   uint32_t es7210_mic_mask =
-                      ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4);
+                      ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4,
+                  bool speaker_pa_enabled = true,
+                  bool std_stereo_input = false,
+                  bool graceful_init_failure = false);
     virtual ~BoxAudioCodec();
+
+    bool ready() const { return ready_; }
 
     virtual void SetOutputVolume(int volume) override;
     virtual void EnableInput(bool enable) override;
     virtual void EnableOutput(bool enable) override;
+
+    // Bounded raw checks for first-board audio bring-up. These do not change
+    // codec configuration or enable the speaker amplifier.
+    void LogInputDiagnostics();
 };
 
 #endif // _BOX_AUDIO_CODEC_H

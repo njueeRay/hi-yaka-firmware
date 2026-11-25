@@ -1,5 +1,8 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  # HiYaKa PN532 transport/protocol stack. Pin exactly: NFC behavior and
+  # timeout semantics are release evidence, not an unconstrained build input.
+  jef-sure/pn532: ==0.8.2
   espressif/ip101:
     version: ^1.1.0
     rules:

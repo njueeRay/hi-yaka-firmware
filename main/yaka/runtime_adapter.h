@@ -33,6 +33,7 @@ public:
     void OnPhysicalInput(PhysicalKey key, KeyGesture gesture);
     void OnNetworkEvent(NetworkEvent event);
     void OnDeviceState(DeviceState state);
+    void OnNfcScanCompleted(bool found);
 
     void Present(const ProductSnapshot& snapshot) override;
     void SetEnabled(bool enabled) override;

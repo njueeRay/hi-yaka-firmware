@@ -235,9 +235,9 @@ bool RuntimeAdapter::BeginDialogueSession() {
 }
 
 void RuntimeAdapter::CancelOperation() {}
-bool RuntimeAdapter::BeginScan() { return false; }
-void RuntimeAdapter::CancelScan() {}
-void RuntimeAdapter::SetMonitoring(bool) {}
+bool RuntimeAdapter::BeginScan() { return BoardBeginNfcScan(); }
+void RuntimeAdapter::CancelScan() { BoardCancelNfcScan(); }
+void RuntimeAdapter::SetMonitoring(bool enabled) { SetBoardImuMonitoring(enabled); }
 bool RuntimeAdapter::PrepareShutdown() { return true; }
 bool RuntimeAdapter::BeginUpdate() { return false; }
 void RuntimeAdapter::CancelUpdate() {}
@@ -332,6 +332,27 @@ void RuntimeAdapter::OnNetworkEvent(NetworkEvent event) {
             break;
         default:
             break;
+    }
+}
+
+void RuntimeAdapter::OnNfcScanCompleted(bool found) {
+    if (!initialized_.load()) {
+        return;
+    }
+    if (found) {
+        Post(ProductEventType::kNfcCompleted, EventSource::kNfc);
+    } else {
+        ProductEvent event{};
+        event.type = ProductEventType::kOperationTimedOut;
+        event.source = EventSource::kNfc;
+        event.timestamp_ms = NowMs();
+        event.deadline_ms = event.timestamp_ms + 1000;
+        event.correlation_id = ++next_correlation_id_;
+        event.error = ErrorCode::kOperationTimedOut;
+        if (controller_ != nullptr &&
+            controller_->Post(event) == QueuePushResult::kAccepted) {
+            controller_->ProcessAll(event.timestamp_ms);
+        }
     }
 }
 

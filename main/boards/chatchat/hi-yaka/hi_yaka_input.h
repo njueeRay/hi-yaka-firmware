@@ -37,6 +37,11 @@ private:
     esp_timer_handle_t timer_ = nullptr;
     std::array<KeyState, 8> keys_{};
     bool enabled_ = true;
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    int last_ladder_mv_ = -1;
+    int last_key_a_level_ = -1;
+    int last_key_b_level_ = -1;
+#endif
 };
 
 #endif  // HI_YAKA_INPUT_H_

@@ -5,16 +5,23 @@
 
 #include <algorithm>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 constexpr char kTag[] = "HiYaKaFeedback";
 constexpr uint8_t kMaximumChannel = 8;
 constexpr uint32_t kMaximumMotorPulseMs = 120;
+constexpr uint32_t kWarningIndicatorPulseUs = 250 * 1000;
 }  // namespace
 
 HiYaKaFeedback::HiYaKaFeedback(HiYaKaPca9557& expander) : expander_(expander) {}
 
 HiYaKaFeedback::~HiYaKaFeedback() {
+    if (indicator_restore_timer_ != nullptr) {
+        esp_timer_stop(indicator_restore_timer_);
+        esp_timer_delete(indicator_restore_timer_);
+    }
     if (motor_timer_ != nullptr) {
         esp_timer_stop(motor_timer_);
         esp_timer_delete(motor_timer_);
@@ -61,6 +68,24 @@ esp_err_t HiYaKaFeedback::Initialize() {
     timer_config.name = "hi_yaka_motor";
     timer_config.skip_unhandled_events = true;
     result = esp_timer_create(&timer_config, &motor_timer_);
+    if (result != ESP_OK) {
+        return result;
+    }
+
+    esp_timer_create_args_t restore_timer_config = {};
+    restore_timer_config.callback = [](void* context) {
+        auto* self = static_cast<HiYaKaFeedback*>(context);
+        Application::GetInstance().Schedule([self]() {
+            if (self->lab_recording_indicator_override_.load()) {
+                self->SetColor(self->lab_recording_indicator_active_.load() ? 8 : 0, 0, 0);
+            }
+        });
+    };
+    restore_timer_config.arg = this;
+    restore_timer_config.dispatch_method = ESP_TIMER_TASK;
+    restore_timer_config.name = "hi_yaka_feedback_restore";
+    restore_timer_config.skip_unhandled_events = true;
+    result = esp_timer_create(&restore_timer_config, &indicator_restore_timer_);
     if (result == ESP_OK) {
         ESP_LOGI(kTag, "feedback safe-off verified; RGB channel limit=%u", kMaximumChannel);
     }
@@ -94,7 +119,35 @@ void HiYaKaFeedback::PulseMotor(uint32_t duration_ms) {
     }
 }
 
+void HiYaKaFeedback::RunBringupSelfTest() {
+    ESP_LOGI(kTag, "bring-up self-test: RGB red -> green -> blue, then motor 80 ms");
+    SetColor(8, 0, 0);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    SetColor(0, 8, 0);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    SetColor(0, 0, 8);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    SetColor(0, 0, 0);
+    PulseMotor(80);
+    vTaskDelay(pdMS_TO_TICKS(180));
+    ESP_LOGI(kTag, "bring-up self-test complete; feedback returned to safe-off");
+}
+
+void HiYaKaFeedback::SetLabRecordingIndicator(bool active) {
+    // Once the lab recorder is used, the RGB and LED array stay under its
+    // explicit control. State updates must not hide the recording signal.
+    if (indicator_restore_timer_ != nullptr) {
+        esp_timer_stop(indicator_restore_timer_);
+    }
+    lab_recording_indicator_active_.store(active);
+    lab_recording_indicator_override_.store(true);
+    SetColor(active ? 8 : 0, 0, 0);
+}
+
 void HiYaKaFeedback::OnStateChanged() {
+    if (lab_recording_indicator_override_.load()) {
+        return;
+    }
     switch (Application::GetInstance().GetDeviceState()) {
         case kDeviceStateStarting:
         case kDeviceStateWifiConfiguring:
@@ -120,6 +173,28 @@ void HiYaKaFeedback::OnStateChanged() {
 }
 
 void HiYaKaFeedback::Emit(hi_yaka::FeedbackSignal signal) {
+    if (lab_recording_indicator_override_.load()) {
+        // Preserve the recording lamp (or its explicit off state) while
+        // keeping the existing key/motor feedback available in the lab.
+        switch (signal) {
+            case hi_yaka::FeedbackSignal::kAccepted: PulseMotor(35); break;
+            case hi_yaka::FeedbackSignal::kCompleted: PulseMotor(55); break;
+            case hi_yaka::FeedbackSignal::kWarning:
+                SetColor(6, 3, 0);
+                PulseMotor(80);
+                if (indicator_restore_timer_ != nullptr) {
+                    esp_timer_stop(indicator_restore_timer_);
+                    if (esp_timer_start_once(indicator_restore_timer_,
+                                             kWarningIndicatorPulseUs) != ESP_OK) {
+                        SetColor(lab_recording_indicator_active_.load() ? 8 : 0, 0, 0);
+                    }
+                }
+                break;
+            case hi_yaka::FeedbackSignal::kError: PulseMotor(kMaximumMotorPulseMs); break;
+            case hi_yaka::FeedbackSignal::kCancelled: break;
+        }
+        return;
+    }
     switch (signal) {
         case hi_yaka::FeedbackSignal::kAccepted:
             SetColor(0, 3, 3);

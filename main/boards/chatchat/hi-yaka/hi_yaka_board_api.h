@@ -9,6 +9,9 @@ namespace hi_yaka {
 
 bool BoardCapabilityReady(CapabilityId capability);
 void SetBoardInputEnabled(bool enabled);
+bool BoardBeginNfcScan();
+void BoardCancelNfcScan();
+void SetBoardImuMonitoring(bool enabled);
 RecordingStoragePortAdapter* BoardRecordingPort();
 FeedbackPort* BoardFeedbackPort();
 

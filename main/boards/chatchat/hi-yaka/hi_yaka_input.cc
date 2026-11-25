@@ -124,6 +124,24 @@ void HiYaKaInput::Poll() {
         Observe(index, static_cast<int>(index) == active_ladder, now_us);
     }
     // External inversion makes the two direct key signals active-low at the MCU.
-    Observe(6, gpio_get_level(YAKA_KEY_A_GPIO) == 0, now_us);
-    Observe(7, gpio_get_level(YAKA_KEY_B_GPIO) == 0, now_us);
+    const int key_a_level = gpio_get_level(YAKA_KEY_A_GPIO);
+    const int key_b_level = gpio_get_level(YAKA_KEY_B_GPIO);
+    Observe(6, key_a_level == 0, now_us);
+    Observe(7, key_b_level == 0, now_us);
+#if CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS
+    const int ladder_delta = last_ladder_mv_ < 0
+                                 ? 1000
+                                 : (ladder_mv > last_ladder_mv_
+                                        ? ladder_mv - last_ladder_mv_
+                                        : last_ladder_mv_ - ladder_mv);
+    if (ladder_delta >= 50 || key_a_level != last_key_a_level_ ||
+        key_b_level != last_key_b_level_) {
+        ESP_LOGI(kTag,
+                 "BRINGUP input raw: ladder=%d mV decoded=%d key_a=%d key_b=%d",
+                 ladder_mv, active_ladder, key_a_level, key_b_level);
+        last_ladder_mv_ = ladder_mv;
+        last_key_a_level_ = key_a_level;
+        last_key_b_level_ = key_b_level;
+    }
+#endif
 }
