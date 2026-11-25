@@ -32,7 +32,7 @@
 
 ST7789 为只写屏幕接口，`ESP_OK` 只能证明主控提交传输。用户在第二次复位时目视确认三个模式结束标记依次为**完整红屏、绿屏、蓝屏**，没有观察到裁切、雪花或异常发热；首次结束后的蓝屏也得到目视确认。因此本次三种方式的**基础显示与整屏传输**均通过。该观察未覆盖长期运行、复杂界面或高于 12 MHz 的 SPI 时钟。
 
-## PARLIO 补充实验：设备端完成，但实屏显示失败
+## PARLIO 补充实验：旧路径实屏失败，2×2 对照收缩范围
 
 独立工程加入第四种 `PARLIO_TX` 传输路径后，四模式应用镜像 SHA-256 为 `E5C529E0393CA09B2D04E65CB444F573C8A438388E18EBA354FBE493B68CB202`。首轮原始日志 `bench-parlio-run1.log` 位于同一工作区 `.tmp/waveshare-c6-lcd-147-20261125/`，SHA-256 为 `9D36FDF6E748F39ED90D18CA74B149CE82ACB46EE0EB9DFBE0349034CE4F87B9`。日志到达 `BENCH_DONE`，PARLIO 的 15 次整屏传输均返回 `ESP_OK`，平均 **0.916311 s/110,080 字节**，等效约 **1.091 次/秒**。该镜像内其他三种方式的平均值为慢 GPIO **3.133851 s**、快 GPIO **0.708521 s**、SPI2 12 MHz **0.083851 s**，与原三模式镜像接近。
 
@@ -50,13 +50,28 @@ ST7789 为只写屏幕接口，`ESP_OK` 只能证明主控提交传输。用户�
 
 ESP-IDF 6.1 的通用 PARLIO TX 支持 C6，而官方 `esp_lcd` PARLIO 屏幕封装由 `SOC_PARLIO_LCD_SUPPORTED` 控制，C6 未启用该封装；不能把未链接成功的官方封装实验当作显示失败。参考：[ESP-IDF PARLIO TX 文档](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/api-reference/peripherals/parlio/parlio_tx.html)、[官方 esp_lcd 构建条件](https://github.com/espressif/esp-idf/blob/v6.1/components/esp_lcd/CMakeLists.txt)。
 
+### PARLIO valid-CS 与位序 2×2 对照：实屏结果
+
+旧的手动 CS＋MSB 路径在上述多轮实验中出现横带、分界和字样错序。另建的 **PARLIO valid 输出接管 LCD 低有效 CS＋MSB** 镜像 `app-valid-cs.bin` SHA-256 `C050D540438C354C2626D3D3236963FCD80F004EF0DDF382B5FF0D159FB0CA4A`：`run-valid-cs.log` SHA-256 `15031126F5E55C3A83C87CB39C8A81ED5F8562E8AB635EAE3912756B596F7E21`，串口记录 PARLIO 像素阶段约 **890,202 µs**；用户照片显示**整屏红粉色、黑色 `PARLIO` 字样完整、无横向断层**。
+
+在同一 valid-CS 条件下，仅把源码 `cfg.bit_pack_order` 从 `PARLIO_BIT_PACK_ORDER_MSB` 改为 `PARLIO_BIT_PACK_ORDER_LSB`：镜像 `app-valid-cs-lsb.bin` SHA-256 `B1E0395914C7D3EEC78EE01CDCD06FE2B14A8799A0C56F0B30433D8EEA0D70A9`；`run-valid-cs-lsb.log` SHA-256 `D94CE6B5669772273167E87917173FF74ACC7C7C9BDB43027BE186FCCDD9C592`，串口记录约 **890,193 µs**。用户两次复位目视确认**整屏绿色、黑色 `PARLIO` 字样完整、无断层，温度正常**。两份 `main.c` 的本轮差异仅这一行位序配置；颜色变化表明输出内容受位序配置影响，但两者都能成屏，不能单凭本对照判定位序是先前花屏的唯一原因。
+
+| CS 控制 | MSB | LSB |
+|---|---|---|
+| 手动 GPIO CS | 旧路径实屏异常，见上文 | 串口传输完成；复测照片显示上绿下红分界、字样错位，实屏异常 |
+| PARLIO valid 接管 CS | 整屏红粉、字样完整 | 整屏绿、字样完整；两次复位确认 |
+
+第四格 **手动 GPIO CS＋LSB** 镜像 `app-manual-cs-lsb.bin` SHA-256 `6ADA885EA031266CA1B13B43989D2D200FC0F78BDF3B534CDE9A773A990C91A0`；`run-manual-cs-lsb.log` SHA-256 `82290F3D8C238BAD6E6CBF92E7FA58A34DC8EC0E42E4DFA9DEBDEE9E90C8F06D`，串口报像素阶段约 **890,200 µs**。第一次测试的绿色画面反馈发生在恢复 valid-CS＋LSB *之后*，不能归入第四格。随后再次烧入手动 CS＋LSB 并完成写后哈希校验，用户确认温度正常，照片显示**上半绿色、下半红粉色，约交易分界处断开，顶部 `PARLIO` 字样错位**。这才是第四格的实屏结果。
+
+四格对照在这块微雪板及当前程序中支持：**valid-CS 接管时两种位序都能显示完整几何画面；手动 GPIO CS 时两种位序都出现分界或字样错误**。这把问题收缩到 CS 控制／切换时序相关路径，但不证明 CS 是唯一根因，也未核对实际寄存器位、波形与 RGB565 颜色语义。ESP-IDF 位序枚举与 C6 TRM 寄存器描述的映射差异仍只是待证线索。最终已重新烧入 valid-CS＋LSB 并通过写后哈希校验；用户再次确认整屏绿、`PARLIO` 字样完整、温度正常。以上仅为微雪外部板结论，不关闭 HiYaKa 的 PCA9557、共享 I²C 或 M2 验收。
+
 ## SPI DMA 菜单与动画局刷：独立外部对照
 
 为观察比整屏纯色更接近界面的刷新，另在 COM7 烧录隔离工程 `.tmp/waveshare-c6-lcd-menu-demo-20261125/dist/waveshare_c6_lcd_menu_demo.bin`，SHA-256 `F03C14FBD10103D2C22BFBC76634E1F138E9AC2C2152B901BC2895530E7F38E6`；烧录使用 115200、no-stub，写后哈希校验通过。该程序用 SPI2 12 MHz 驱动微雪 ST7789，包含 `MENU`、`UPTIME`、24×24 动画区域及 `GIF`／`CLK` 数值区域。屏上时间是**设备上电时长 UPTIME**，并非实时时钟日期。
 
 原始 `run1-menu.log` SHA-256 `0C2E0E22E19D08E27E20F2B4AF36EF3A4AB1796C26289AB1F1EC007094702780`。65 条逐秒 `PARTIAL` 样本均返回 `ESP_OK`；24×24 区域每次发送 576 像素／1,152 字节，传输耗时 **1,005–1,010 µs，均值 1,005.6 µs**；时钟区域每次发送 3,432 像素／6,864 字节，传输耗时 **5,329–5,332 µs，均值 5,329.8 µs**。日志末 `gif_frames=427` 是约 65 秒观察窗口内的累计计数。以上计时只包围显示命令与像素传输，**不含绘制、动画帧生成或 GIF 解码**，不得把局刷耗时直接当产品界面帧率。
 
-用户本次一次性目视确认 `MENU`、`UPTIME`、24×24 动画及 `GIF`／`CLK` 数值均正常显示，没有裁切、花屏或异常发热。这证明微雪板的 **SPI DMA 局部刷新**可正确呈现该演示界面；一次目视与 65 秒日志不构成长期稳定性验证，也不改变上述 PARLIO 实屏失败结论。
+用户本次一次性目视确认 `MENU`、`UPTIME`、24×24 动画及 `GIF`／`CLK` 数值均正常显示，没有裁切、花屏或异常发热。这证明微雪板的 **SPI DMA 局部刷新**可正确呈现该演示界面；一次目视与 65 秒日志不构成长期稳定性验证，也不改变上述旧手动 CS PARLIO 路径的实屏失败记录。
 
 ## 同画面 48×48 菜单传输 A/B/C：串口与轮换版实屏已验证
 
@@ -86,8 +101,26 @@ ESP-IDF 6.1 的通用 PARLIO TX 支持 C6，而官方 `esp_lcd` PARLIO 屏幕封
 
 低速 GPIO 首轮在 **10.169216 秒完成 21 帧，约 2.1 帧／秒**；高速 GPIO 为 65 帧／10.038204 秒，SPI2 DMA 为 67 帧／10.007421 秒。用户最初认为三段“速度差别不明显”，并曾把低速单版描述为“完整显示且流畅”；连续观察轮换版后，进一步明确反馈 **“GPIO SLOW 确实最卡，GPIO FAST 稍好”**，而高速 GPIO 与 SPI 的主观差别较小。以后一次更具体的观察作为当前主观结论。低速模式能完整绘制菜单，与其动画仅约 2.1 帧／秒并不矛盾；高速 GPIO 和 SPI 的完成帧数接近，还受动画目标 **150 ms/帧**的节拍限制，不能从这一演示推断两者传输性能相同或极限帧率相同。
 
+## PARLIO 动态全屏、区域刷新和菜单：1 MHz／10 MHz 实屏确认
+
+在已目视通过的静态 valid-CS＋LSB 配置上，建立独立的 ESP-IDF 6.1 微雪实验工程。GPIO14 由 PARLIO 的反相 valid 信号控制 LCD CS；每次设置显示窗口前，先等待并释放 PARLIO，再显式把 GPIO6／7／14 的输出矩阵切回普通 GPIO，用短命令发送 CASET、RASET、RAMWR，最后重新建立 PARLIO 发送 RGB565 像素。每笔最多 160 行／55,040 字节；所有区域传输均按完整像素和 32 位边界切分。实验依次尝试非同色四象限整屏、黑底四角 24×24 区域，以及 MENU、UPTIME 和 48×48 预解码帧动画。此处“动画”不是在设备上实时解码 GIF。
+
+主 Agent 审查源码后，分别用 115200、no-stub 将 1 MHz 和 10 MHz 应用镜像写入 COM7 的 0x10000，esptool 两次均完成写后哈希校验。两个镜像的源码与构建条件相同，仅 PARLIO 请求时钟不同。1 MHz 原镜像 SHA-256 为 `9D54019211643F3DC3511D99F8C1AEB41FD2DA383882F814EEE3EBB0FF540C0D`，10 MHz 原镜像为 `BAB9A7AD98DF6377EB1767485423BE85562EC410B0B41D69B166ABB3943DC8AB`。原版动画帧率统计在刷新前取时间、刷新后计帧，存在取样偏差；其刷新微秒计数不受此错误影响。随后仅修正统计窗口的取时，10 MHz v2 镜像 SHA-256 为 `8B1585A9387415F98604AF496D383A7D1941266227639EDD27429116FE3163E0`，再次烧录并校验。v2 是目前留在 COM7 上的版本。
+
+| 请求时钟 | 整屏 110,080 B：像素传输 | 整屏：含命令、切换和缓冲生成 | 48×48 动画区域：像素传输 | 48×48：含命令和切换 |
+|---|---:|---:|---:|---:|
+| 1 MHz 原版 | 880,753 µs | 895,308 µs | 约 36,900 µs | 约 38,550 µs |
+| 10 MHz 原版 | 88,177 µs | 102,774 µs | 约 3,730 µs | 约 5,400 µs |
+| 10 MHz v2 | 88,181 µs | 102,769 µs | 约 3,730 µs | 约 5,400 µs |
+
+整屏计时包含 CPU 填充像素缓冲，区域刷新计时不含文字绘制或动画帧准备，不能直接把两列“完整耗时”当作同一口径的产品帧率。10 MHz v2 运行日志约 30 秒内有 30 条逐秒 `PARTIAL`，均为 `ESP_OK`，未见 STOP、panic 或重启；另一段 10 MHz 原版约一分钟被动采集有 55 条 `PARTIAL`，亦未见上述错误。v2 动画按 150 ms 目标间隔调度，逐秒完成约 6–7 帧，这个数值是**演示程序的节拍结果**，不是传输能力上限。
+
+原始日志在工作区 `.tmp/waveshare-c6-lcd-parlio-menu-20261125/`：`run-1mhz.log`、`run-10mhz.log`、`run-10mhz-passive.log`、`run-v2-10mhz.log` 的 SHA-256 依次为 `13E92628299A9FAE8448E49D9969A904866F79ACC90E77EEDFBFCF33C2E93AC1`、`F6D4DB0402C0017C85E4F74FB6042940F8D4E841A5A120CCAC0CF2AC065EC541`、`608DBF26EDD49349E15DE6EA6ADEC550C57203BFF43BAA1D7C754530EFB025EB`、`A5661007F60BC7DFE6E51FA61A571F943D3EC0C2745EC8A3D86BEAC3CAF682A9`。
+
+**实屏证据与边界：**用户对 1 MHz 版回报“四象限、四角和菜单动画都正常”；对后来烧入的 10 MHz 版回报“全部正常、温度正常”。后者的画面配置与留在板上的 10 MHz v2 相同，v2 仅修正帧率统计取时。结合串口日志，本次确认微雪板上两档 PARLIO 的动态整屏、区域刷新和菜单均可用。1 MHz 的目视反馈是在切换到 10 MHz 后回顾提供，未留当时的实屏照片；本结论限于这次人工观察和约一分钟连续日志，未覆盖长期运行、全温及信号波形，也不能直接作为 HiYaKa 的 M2 证据。[微雪板级资料](https://docs.waveshare.com/ESP32-C6-LCD-1.47)未公布 PARLIO 的板级额定最高频率，且仅标 ST7789；微雪提供的 [ST7789V3 时序表](https://files.waveshare.com/upload/c/c1/ST7789V3_V0.1.pdf)给出四线串行写入时钟周期至少 16 ns，折算 62.5 MHz 是该器件版本的时序边界，**不是此板的已验证频率上限**。当前微雪 PARLIO 实测仅覆盖 1 MHz、10 MHz。
+
 ## 对 HiYaKa 的解释与待测项
 
 微雪板的 CS、DC、RST、背光直接连接 ESP32-C6；HiYaKa c0 样机则由 PCA9557 控制其中若干脚。微雪三模式通过，支持“ESP32-C6 能用 GPIO 和 SPI2 驱动这一类串行 ST7789 屏”的结论，不能排除 HiYaKa 的 PCA9557 控制失联、共享 I²C 电气问题或 HiYaKa PARLIO 编码问题。两板面板版本和显示窗口亦不同，速度数值不应直接当作 HiYaKa 产品帧率。
 
-**PARLIO：主控侧交易完成，微雪实屏已确认异常。** 当前不能用于 HiYaKa 的显示基线。已验证可正确显示的慢速 GPIO、高速 GPIO 与 SPI DMA 菜单路径，仍只属于微雪外部对照；它们不能关闭 HiYaKa 的 PCA9557、共享 I²C 或 PARLIO 问题，也不能作为 HiYaKa M2 完成证据。
+**PARLIO：微雪板 2×2 实屏对照已完成，手动 CS 两格异常，valid-CS 两格几何画面完整；具体时序根因未定。** 现阶段不据此选择 HiYaKa 的产品显示基线。已验证可正确显示的慢速 GPIO、高速 GPIO 与 SPI DMA 菜单路径也只属于微雪外部对照；它们都不能关闭 HiYaKa 的 PCA9557、共享 I²C 或 PARLIO 问题，亦不能作为 HiYaKa M2 完成证据。
