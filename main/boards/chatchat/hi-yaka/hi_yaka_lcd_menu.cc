@@ -119,9 +119,7 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
         lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
         lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
     }
-    // A 150 ms timer can nearly saturate the observed 143 ms GPIO flush.
-    // Keep the diagnostic interactive while allowing an idle gap for I2C.
-    lv_timer_create(UpdateMenu, 300, &state);
+    lv_timer_create(UpdateMenu, 150, &state);
     lvgl_port_unlock();
 }
 #else
