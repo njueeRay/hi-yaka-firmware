@@ -480,39 +480,6 @@ private:
                                                     pca_exhausted_before));
                 vTaskDelay(pdMS_TO_TICKS(1500));
             }
-            // A fixed-size transfer probe is comparable across GPIO slow,
-            // GPIO fast and PARLIO. It measures panel transfer plus PCA9557
-            // control, excluding LVGL scheduling and the five-color delay.
-            constexpr int kProbeSize = 48;
-            constexpr int kProbeX = 8;
-            constexpr int kProbeY = 8;
-            // One sample only: consecutive probes exhausted PCA9557 writes
-            // on c0 before the display object could be constructed.
-            constexpr std::array<uint16_t, 1> kProbeColors = {0xF800};
-            for (size_t sample = 0; sample < kProbeColors.size(); ++sample) {
-                std::fill_n(test_pixels, kProbeSize * kProbeSize,
-                            kProbeColors[sample]);
-                const uint32_t pca_first_before = pca9557_->first_write_failures();
-                const uint32_t pca_exhausted_before = pca9557_->exhausted_writes();
-                const int64_t started_us = esp_timer_get_time();
-                const esp_err_t probe_result = esp_lcd_panel_draw_bitmap(
-                    panel, kProbeX, kProbeY, kProbeX + kProbeSize,
-                    kProbeY + kProbeSize, test_pixels);
-                const int64_t elapsed_us = esp_timer_get_time() - started_us;
-                ESP_LOGI(TAG,
-                         "LCD_BENCH kind=region sample=%u x=%d y=%d size=%dx%d bytes=%u ok=%u elapsed_us=%lld pca_first_delta=%lu pca_exhausted_delta=%lu",
-                         static_cast<unsigned>(sample), kProbeX, kProbeY,
-                         kProbeSize, kProbeSize,
-                         static_cast<unsigned>(kProbeSize * kProbeSize *
-                                               sizeof(uint16_t)),
-                         static_cast<unsigned>(probe_result == ESP_OK),
-                         static_cast<long long>(elapsed_us),
-                         static_cast<unsigned long>(pca9557_->first_write_failures() -
-                                                    pca_first_before),
-                         static_cast<unsigned long>(pca9557_->exhausted_writes() -
-                                                    pca_exhausted_before));
-                if (probe_result != ESP_OK) break;
-            }
             free(test_pixels);
         } else {
             ESP_LOGE(TAG, "LCD color test skipped: no internal buffer");
