@@ -1,5 +1,7 @@
 #include "hi_yaka_lcd_menu.h"
 
+#include "config.h"
+#include "hi_yaka_demo_frames.h"
 #include "hi_yaka_expander_lcd_io.h"
 
 #include <cstdio>
@@ -17,6 +19,7 @@ struct MenuState {
     lv_obj_t* root;
     lv_obj_t* uptime;
     lv_obj_t* animation;
+    lv_obj_t* mode;
     lv_obj_t* timing;
     lv_obj_t* health;
     lv_obj_t* retries;
@@ -28,6 +31,32 @@ struct MenuState {
     bool one_shot_done = false;
     bool one_shot_wait_logged = false;
 };
+
+// The reference GIF is decoded ahead of time into eight RGB565 frames. Each
+// descriptor points at immutable flash data; no runtime GIF decoder is used.
+lv_image_dsc_t frame_images[GIF_FRAME_COUNT] = {};
+
+const char* TransportName() {
+#if CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+    return "GPIO FAST";
+#elif CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+    return "GPIO SLOW";
+#else
+    return "PARLIO";
+#endif
+}
+
+void PrepareFrames() {
+    for (size_t i = 0; i < GIF_FRAME_COUNT; ++i) {
+        frame_images[i].header.magic = LV_IMAGE_HEADER_MAGIC;
+        frame_images[i].header.cf = LV_COLOR_FORMAT_RGB565;
+        frame_images[i].header.w = GIF_WIDTH;
+        frame_images[i].header.h = GIF_HEIGHT;
+        frame_images[i].header.stride = GIF_WIDTH * sizeof(uint16_t);
+        frame_images[i].data_size = sizeof(gif_frames[i]);
+        frame_images[i].data = reinterpret_cast<const uint8_t*>(gif_frames[i]);
+    }
+}
 
 const char* FailureStageName(HiYaKaLcdFailureStage stage) {
     switch (stage) {
@@ -44,11 +73,9 @@ void UpdateMenu(lv_timer_t* timer) {
     auto* state = static_cast<MenuState*>(lv_timer_get_user_data(timer));
     if (state == nullptr) return;
 
-    // A bounded 48x48 animation exercises the same partial-refresh path as
-    // the external menu demo without bringing its screen pins or SPI2 driver.
-    constexpr uint32_t kColors[] = {0x00AEEA, 0x22C55E, 0xF59E0B, 0xEF4444};
-    lv_obj_set_style_bg_color(state->animation,
-                              lv_color_hex(kColors[(state->frame++) % 4]), 0);
+    // Keep the 48x48 changing region identical in both transport profiles.
+    lv_image_set_src(state->animation,
+                     &frame_images[(state->frame++) % GIF_FRAME_COUNT]);
 
     const uint32_t seconds = static_cast<uint32_t>(esp_timer_get_time() / 1000000);
     if (seconds == state->last_second) return;
@@ -92,15 +119,15 @@ void UpdateMenu(lv_timer_t* timer) {
                      static_cast<unsigned long>(stats.failed),
                      static_cast<unsigned long>(stats.last_failure.sequence));
         }
-        std::snprintf(line, sizeof(line), "LCD last %lu  max %lu ms",
+        std::snprintf(line, sizeof(line), "LCD %lu / %lu ms",
                       static_cast<unsigned long>(stats.last_us / 1000),
                       static_cast<unsigned long>(stats.max_us / 1000));
         lv_label_set_text(state->timing, line);
-        std::snprintf(line, sizeof(line), "slow>50:%lu  draw fail:%lu",
+        std::snprintf(line, sizeof(line), "SLOW %lu  DRAW FAIL %lu",
                       static_cast<unsigned long>(stats.slow_over_50ms),
                       static_cast<unsigned long>(stats.failed));
         lv_label_set_text(state->health, line);
-        std::snprintf(line, sizeof(line), "PCA first:%lu  exhausted:%lu",
+        std::snprintf(line, sizeof(line), "PCA FIRST %lu  EXH %lu",
                       static_cast<unsigned long>(state->expander->first_write_failures()),
                       static_cast<unsigned long>(state->expander->exhausted_writes()));
         lv_label_set_text(state->retries, line);
@@ -133,7 +160,8 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
                                        HiYaKaPca9557* expander) {
     if (io == nullptr || expander == nullptr || !lvgl_port_lock(1000)) return;
     static MenuState state{io, expander, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr};
+                           nullptr, nullptr, nullptr};
+    PrepareFrames();
     HiYaKaLcdRefreshStats initial_stats{};
     if (hi_yaka_lcd_refresh_stats(io, &initial_stats) == ESP_OK) {
         state.completed_before_menu = initial_stats.completed;
@@ -147,7 +175,7 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
     state.menu_created_us = esp_timer_get_time();
     lv_obj_set_size(root, width, height);
     lv_obj_set_pos(root, 0, 0);
-    lv_obj_set_style_bg_color(root, lv_color_hex(0x0B1220), 0);
+    lv_obj_set_style_bg_color(root, lv_color_white(), 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(root, 0, 0);
     lv_obj_set_style_radius(root, 0, 0);
@@ -156,33 +184,35 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* title = lv_label_create(root);
-    lv_label_set_text(title, "HiYaKa  MENU  GPIO FAST");
-    lv_obj_set_style_text_color(title, lv_color_white(), 0);
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 7);
+    lv_label_set_text(title, "HiYaKa LCD DEMO");
+    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 5);
 
     state.uptime = lv_label_create(root);
-    lv_obj_set_style_text_color(state.uptime, lv_color_white(), 0);
-    lv_obj_align(state.uptime, LV_ALIGN_TOP_LEFT, 8, 36);
-    state.animation = lv_obj_create(root);
-    lv_obj_set_size(state.animation, 48, 48);
-    lv_obj_set_style_border_width(state.animation, 0, 0);
-    lv_obj_set_style_radius(state.animation, 6, 0);
-    lv_obj_align(state.animation, LV_ALIGN_TOP_LEFT, 8, 72);
+    lv_obj_align(state.uptime, LV_ALIGN_TOP_LEFT, 8, 27);
+    state.animation = lv_image_create(root);
+    lv_image_set_src(state.animation, &frame_images[0]);
+    lv_obj_align(state.animation, LV_ALIGN_TOP_LEFT, 8, 52);
+    lv_obj_t* animation_caption = lv_label_create(root);
+    lv_label_set_text(animation_caption, "ANIMATION 48x48");
+    lv_obj_align(animation_caption, LV_ALIGN_TOP_LEFT, 68, 65);
     state.timing = lv_label_create(root);
-    lv_obj_set_style_text_color(state.timing, lv_color_white(), 0);
-    lv_obj_align(state.timing, LV_ALIGN_TOP_LEFT, 8, 124);
+    lv_obj_align(state.timing, LV_ALIGN_TOP_LEFT, 8, 109);
     state.health = lv_label_create(root);
-    lv_obj_set_style_text_color(state.health, lv_color_white(), 0);
-    lv_obj_align(state.health, LV_ALIGN_TOP_LEFT, 8, 145);
+    lv_obj_align(state.health, LV_ALIGN_TOP_LEFT, 8, 131);
     state.retries = lv_label_create(root);
-    lv_obj_set_style_text_color(state.retries, lv_color_white(), 0);
-    lv_obj_align(state.retries, LV_ALIGN_TOP_LEFT, 8, 166);
-    lv_obj_t* labels[] = {title, state.uptime, state.timing, state.health,
-                          state.retries};
+    lv_obj_align(state.retries, LV_ALIGN_TOP_LEFT, 8, 153);
+    state.mode = lv_label_create(root);
+    char mode_line[32];
+    std::snprintf(mode_line, sizeof(mode_line), "MODE: %s", TransportName());
+    lv_label_set_text(state.mode, mode_line);
+    lv_obj_align(state.mode, LV_ALIGN_TOP_LEFT, 8, 176);
+    lv_obj_t* labels[] = {title, state.uptime, animation_caption,
+                          state.timing, state.health, state.retries, state.mode};
     for (lv_obj_t* label : labels) {
         lv_obj_set_size(label, width - 16, 19);
         lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
         lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(label, lv_color_black(), 0);
     }
     lv_timer_create(UpdateMenu, 150, &state);
     lvgl_port_unlock();

@@ -1186,12 +1186,14 @@ menu "HiYaKa pre-board laboratory features"
             diagnostic remains unchanged unless this flag is set.
 
     config HI_YAKA_LCD_MENU_DIAGNOSTIC
-        bool "Show GPIO LCD menu and refresh diagnostics"
-        depends on HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+        bool "Show LCD menu and refresh diagnostics"
+        depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS
         default n
         help
             Laboratory-only landscape menu with uptime, 48-pixel animation,
-            LCD refresh timing and PCA9557 retry counters. Not a product UI.
+            active transport mode, LCD refresh timing and PCA9557 retry counters.
+            This may be combined with either GPIO fast or PARLIO for A/B tests.
+            Not a product UI.
 
     config HI_YAKA_ENABLE_INPUT
         bool "Enable provisional physical input adapter"
