@@ -4,7 +4,7 @@
 > 飞书目录：[HiYaKa](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)
 > 原则：Git Markdown 保存可审计的工程事实源；飞书保存协作副本、跨文档索引和附件入口。
 
-> **2026-11-25 最新同步：**YAKA-0004 本地专项新增“硬件／软件 I²C 隔离诊断已准备”L0 记录，本地 SHA-256 `B1B16414034B5529888B38164336E365573D966D2E2628757C9ECC957E8D564E`；飞书原生正文 [YAKA-0004](https://scnlb1lk96sb.feishu.cn/docx/SLgSdvt0PoIvcqxJ2uAcCjNQnDe) revision 145 已回读同段。隔离提交 `dcbe017` 的 IDF 6.1 镜像已构建、默认 HOLD、未烧录；COM5 当前枚举但板卡与 PN532 模式脚未复核。Base 维持此前 revision 100 的“处理中”，M2 未验收；本次未上传新附件，也未改动公开仓库。
+> **2026-11-25 最新同步：**YAKA-0004 本地专项新增“硬件／软件 I²C 隔离诊断已准备”和“软件隔离路径复核”两段，本地 SHA-256 `ACD2694B3DC4F2E11381815BF79184C8E0D12991DFCBB9089460668B9ABE888C`；飞书原生正文 [YAKA-0004](https://scnlb1lk96sb.feishu.cn/docx/SLgSdvt0PoIvcqxJ2uAcCjNQnDe) revision 146 已回读。隔离提交 `dcbe017` 的 IDF 6.1 镜像已构建、默认 HOLD、未烧录；旧板冻结网表无 MCU 可控的 PN532 模式／复位隔离路径，COM5 当前枚举但板卡与实体模式脚未复核。Base 维持此前 revision 100 的“处理中”，M2 未验收；本次未上传新附件，也未改动公开仓库。
 
 > **2026-11-25 此前增补：**YAKA-0004 已加入同板 ES7210 软件 I²C 历史旁证，明确它降低“纯 IDF 硬件控制器问题”作为通用解释的优先级，但不证明与 PCA9557 同源；c0 的 COM5 当时未枚举，未做新烧录。飞书正文 revision 144 已回读两份原始数字采样的时序复算，Base YAKA-0004 最新进展与“处理中”状态回读至 revision 100；本地专项 SHA-256 见下方映射，M2 仍未验收。
 
