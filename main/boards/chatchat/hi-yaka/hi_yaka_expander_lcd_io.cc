@@ -42,6 +42,13 @@ struct ExpanderLcdIo {
     std::atomic<uint32_t> refresh_slow{0};
     std::atomic<uint32_t> refresh_last_us{0};
     std::atomic<uint32_t> refresh_max_us{0};
+    HiYaKaLcdFailureSnapshot last_failure;
+    uint16_t window_x_start = 0;
+    uint16_t window_x_end = 0;
+    uint16_t window_y_start = 0;
+    uint16_t window_y_end = 0;
+    bool window_has_columns = false;
+    bool window_has_rows = false;
     std::mutex mutex;
 };
 
@@ -133,6 +140,44 @@ esp_err_t FinishTransaction(ExpanderLcdIo* context, esp_err_t result) {
     return result == ESP_OK ? deselect : result;
 }
 
+void CaptureWindow(ExpanderLcdIo* context, int lcd_cmd, const void* param,
+                   size_t param_size) {
+    if (lcd_cmd == LCD_CMD_CASET) {
+        context->window_has_columns = false;
+        context->window_has_rows = false;
+    }
+    if (param == nullptr || param_size != 4 ||
+        (lcd_cmd != LCD_CMD_CASET && lcd_cmd != LCD_CMD_RASET)) {
+        return;
+    }
+    const auto* bytes = static_cast<const uint8_t*>(param);
+    const uint16_t start = static_cast<uint16_t>((bytes[0] << 8) | bytes[1]);
+    const uint16_t end = static_cast<uint16_t>((bytes[2] << 8) | bytes[3]);
+    if (lcd_cmd == LCD_CMD_CASET) {
+        context->window_x_start = start;
+        context->window_x_end = end;
+        context->window_has_columns = true;
+    } else {
+        context->window_y_start = start;
+        context->window_y_end = end;
+        context->window_has_rows = true;
+    }
+}
+
+void RecordFailure(ExpanderLcdIo* context, HiYaKaLcdFailureStage stage,
+                   esp_err_t error) {
+    auto& snapshot = context->last_failure;
+    ++snapshot.sequence;
+    snapshot.stage = stage;
+    snapshot.error = error;
+    snapshot.x_start = context->window_x_start;
+    snapshot.x_end = context->window_x_end;
+    snapshot.y_start = context->window_y_start;
+    snapshot.y_end = context->window_y_end;
+    snapshot.has_columns = context->window_has_columns;
+    snapshot.has_rows = context->window_has_rows;
+}
+
 void NotifyColorDone(ExpanderLcdIo* context) {
     if (context->callbacks.on_color_trans_done != nullptr) {
         esp_lcd_panel_io_event_data_t event = {};
@@ -159,6 +204,9 @@ esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
             context->flush_pending = true;
             context->refresh_started_us = esp_timer_get_time();
         }
+        if (context->flush_pending) {
+            CaptureWindow(context, lcd_cmd, param, param_size);
+        }
 
         result = context->expander->SetLcdControl(true, false);
         if (result == ESP_OK && lcd_cmd >= 0) {
@@ -171,9 +219,19 @@ esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
                 result = Transmit(context, param, param_size);
             }
         }
+        const esp_err_t transfer_result = result;
         result = FinishTransaction(context, result);
         if (result != ESP_OK && context->flush_pending) {
             context->refresh_failed.fetch_add(1);
+            RecordFailure(context,
+                          transfer_result == ESP_OK
+                              ? HiYaKaLcdFailureStage::kCsRelease
+                              : lcd_cmd == LCD_CMD_CASET
+                                    ? HiYaKaLcdFailureStage::kCaset
+                                    : lcd_cmd == LCD_CMD_RASET
+                                          ? HiYaKaLcdFailureStage::kRaset
+                                          : HiYaKaLcdFailureStage::kOther,
+                          result);
             context->flush_pending = false;
             context->refresh_started_us = 0;
             release_failed_flush = true;
@@ -205,6 +263,7 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
                 result = Transmit(context, color, color_size);
             }
         }
+        const esp_err_t transfer_result = result;
         result = FinishTransaction(context, result);
         if (context->refresh_started_us > 0) {
             const uint32_t elapsed_us = static_cast<uint32_t>(
@@ -215,7 +274,14 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
                    !context->refresh_max_us.compare_exchange_weak(previous, elapsed_us)) {}
             if (elapsed_us > 50000) context->refresh_slow.fetch_add(1);
             if (result == ESP_OK) context->refresh_completed.fetch_add(1);
-            else context->refresh_failed.fetch_add(1);
+            else {
+                context->refresh_failed.fetch_add(1);
+                RecordFailure(context,
+                              transfer_result == ESP_OK
+                                  ? HiYaKaLcdFailureStage::kCsRelease
+                                  : HiYaKaLcdFailureStage::kRamwr,
+                              result);
+            }
             context->refresh_started_us = 0;
         }
         context->flush_pending = false;
@@ -276,6 +342,10 @@ esp_err_t hi_yaka_lcd_refresh_stats(esp_lcd_panel_io_handle_t io,
     out->slow_over_50ms = context->refresh_slow.load();
     out->last_us = context->refresh_last_us.load();
     out->max_us = context->refresh_max_us.load();
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        out->last_failure = context->last_failure;
+    }
     return ESP_OK;
 }
 

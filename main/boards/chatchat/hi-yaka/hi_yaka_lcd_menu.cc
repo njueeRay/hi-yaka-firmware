@@ -21,7 +21,19 @@ struct MenuState {
     lv_obj_t* retries;
     uint32_t frame = 0;
     uint32_t last_second = UINT32_MAX;
+    uint32_t last_logged_failure_sequence = 0;
 };
+
+const char* FailureStageName(HiYaKaLcdFailureStage stage) {
+    switch (stage) {
+        case HiYaKaLcdFailureStage::kCaset: return "CASET";
+        case HiYaKaLcdFailureStage::kRaset: return "RASET";
+        case HiYaKaLcdFailureStage::kRamwr: return "RAMWR";
+        case HiYaKaLcdFailureStage::kCsRelease: return "CS_RELEASE";
+        case HiYaKaLcdFailureStage::kOther: return "OTHER";
+        default: return "NONE";
+    }
+}
 
 void UpdateMenu(lv_timer_t* timer) {
     auto* state = static_cast<MenuState*>(lv_timer_get_user_data(timer));
@@ -66,6 +78,18 @@ void UpdateMenu(lv_timer_t* timer) {
                  static_cast<unsigned long>(stats.failed),
                  static_cast<unsigned long>(state->expander->first_write_failures()),
                  static_cast<unsigned long>(state->expander->exhausted_writes()));
+        const auto& failure = stats.last_failure;
+        if (failure.sequence != state->last_logged_failure_sequence) {
+            state->last_logged_failure_sequence = failure.sequence;
+            ESP_LOGW("HiYaKaMenu",
+                     "last LCD failure seq=%lu stage=%s err=%s x=%u..%u%s y=%u..%u%s",
+                     static_cast<unsigned long>(failure.sequence),
+                     FailureStageName(failure.stage), esp_err_to_name(failure.error),
+                     failure.x_start, failure.x_end,
+                     failure.has_columns ? "" : "?",
+                     failure.y_start, failure.y_end,
+                     failure.has_rows ? "" : "?");
+        }
     }
 }
 
