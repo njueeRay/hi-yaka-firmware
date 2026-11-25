@@ -1,0 +1,12 @@
+menu "HiYaKa PCA diagnostic safety"
+
+config HI_YAKA_PCA_STRAPS_FIXED
+    bool "Confirm PN532 mode straps are physically fixed before any I2C trial"
+    default n
+    help
+        The c0 sample previously had R73/R74 removed and floating PN532 mode
+        inputs. Leave this disabled until the physical strap state is fixed
+        and recorded. The default image only logs HOLD and performs no bus
+        transaction.
+
+endmenu
