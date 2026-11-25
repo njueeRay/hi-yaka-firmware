@@ -4,7 +4,7 @@
 > 飞书目录：[HiYaKa](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)
 > 原则：Git Markdown 保存可审计的工程事实源；飞书保存协作副本、跨文档索引和附件入口。
 
-> **2026-11-25 最新增补：**YAKA-0004 已加入同板 ES7210 软件 I²C 历史旁证，明确它降低“纯 IDF 硬件控制器问题”作为通用解释的优先级，但不证明与 PCA9557 同源；c0 的 COM5 当前未枚举，未做新烧录。飞书正文 revision 140 已按新增段落回读；本地专项 SHA-256 见下方映射，M2 仍未验收。
+> **2026-11-25 最新增补：**YAKA-0004 已加入同板 ES7210 软件 I²C 历史旁证，明确它降低“纯 IDF 硬件控制器问题”作为通用解释的优先级，但不证明与 PCA9557 同源；c0 的 COM5 当前未枚举，未做新烧录。飞书正文 revision 140 已按新增段落回读，Base YAKA-0004 最新进展与“处理中”状态回读至 revision 98；本地专项 SHA-256 见下方映射，M2 仍未验收。
 
 > **GitHub 可见性勘误与撤回（2026-11-25）：**个人 `njueeRay/hi-yaka-firmware` 实际为 PUBLIC。内部 YAKA-0004 增补及服务器运维记录曾误经 [PR #18](https://github.com/njueeRay/hi-yaka-firmware/pull/18) 合入公开 feature 分支，已由 [PR #19](https://github.com/njueeRay/hi-yaka-firmware/pull/19) 撤回；当前 feature 分支文件树与 PR #18 前一致。公开提交及 PR 历史仍可访问，不能声称已彻底移除。飞书 revision 140 与本地专项继续维护，暂不再次推往 PUBLIC 仓库；仓库可见性待 Owner 确认。
 
@@ -38,7 +38,7 @@
 | 外部资料治理与 `docs/research/` | [04 外部参考与技术调研](https://scnlb1lk96sb.feishu.cn/docx/Cn2bdVrSboCRKLxuDErcWWSUnpc) | `Cn2bdVrSboCRKLxuDErcWWSUnpc` | 17 | 已登记 FoloToy 竞品与 HiYaKa 小型化专项；位于 `03 协作、决策与调研` |
 | `docs/governance/TEST_AND_RELEASE_INDEX_PROTOCOL.md` | [测试与发布｜主索引与发布协议](https://scnlb1lk96sb.feishu.cn/docx/RXKYdmVHaobeHNx39uNcl8BAnbf) | `RXKYdmVHaobeHNx39uNcl8BAnbf` | 91 | 现行入口仅指 YAKA-0006；0009 归档追溯；0008/0010 分工与目录已回读 |
 | `artifacts/yaka/full_hardware_evidence_audit_20261120/HIYAKA_硬件功能全量证据审计.md` | [硬件功能现状全量汇总审计](https://scnlb1lk96sb.feishu.cn/docx/IqzadBuxIomUbLx0AfGcBj4Tnvb) | `IqzadBuxIomUbLx0AfGcBj4Tnvb` | 27 | 2026-11-20 已更新麦克风与功放两行：麦克风为 `FAIL，最终根因未定`，不再将 I²C 物理层写成已证实；功放为 `R1.6 FAIL，下一版 NS4150B 决策已锁定、未验证`；已回读 |
-| 问题/发布记录与动态状态 | [HiYaKa 反馈与处理台账](https://scnlb1lk96sb.feishu.cn/base/PE5BbvVtOaHxI4soxwKc9w7Cn7b) | Base `PE5BbvVtOaHxI4soxwKc9w7Cn7b` / 表 `tblLefBEZhKEUhcC` | 85 | YAKA-0004/0006：共享 I²C 独立诊断、R8/A0 稳定 3.3 V、LCD 可见但仍重试、麦克风尚无有效 PCM；状态均“处理中”，日期版专项附件已追加并回读 |
+| 问题/发布记录与动态状态 | [HiYaKa 反馈与处理台账](https://scnlb1lk96sb.feishu.cn/base/PE5BbvVtOaHxI4soxwKc9w7Cn7b) | Base `PE5BbvVtOaHxI4soxwKc9w7Cn7b` / 表 `tblLefBEZhKEUhcC` | 98 | YAKA-0004 最新进展已更新至地址阶段 NACK 与当前 M2 未验收，状态仍“处理中”，原始反馈字段保留；其余记录以实时台账为准 |
 | 历史仓库与旧资料归档规则 | [00 历史资料索引](https://scnlb1lk96sb.feishu.cn/docx/KlRxdMk4ho6A5Txs3dqc3KG2nLd) | `KlRxdMk4ho6A5Txs3dqc3KG2nLd` | 10 | 位于 `99 历史资料（只读）` |
 | 已废止的旧接口摘要 | [90 [已废止] 工程基线与接口契约](https://scnlb1lk96sb.feishu.cn/docx/NBzHd2mvgoHQ06xLNXOc0A0tnoe) | `NBzHd2mvgoHQ06xLNXOc0A0tnoe` | 24 | 仅供历史追溯，不得作为当前接口输入 |
 
