@@ -1177,6 +1177,22 @@ menu "HiYaKa pre-board laboratory features"
             with data stable before each rising edge. This isolates the
             PARLIO transport from the panel, FPC and PCA9557 controls.
 
+    config HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+        bool "Use fast GPIO serial output for LCD A/B diagnosis"
+        depends on HI_YAKA_LCD_GPIO_DIAGNOSTIC
+        default n
+        help
+            Remove the two explicit 1 us bit delays. The original slow
+            diagnostic remains unchanged unless this flag is set.
+
+    config HI_YAKA_LCD_MENU_DIAGNOSTIC
+        bool "Show GPIO LCD menu and refresh diagnostics"
+        depends on HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+        default n
+        help
+            Laboratory-only landscape menu with uptime, 48-pixel animation,
+            LCD refresh timing and PCA9557 retry counters. Not a product UI.
+
     config HI_YAKA_ENABLE_INPUT
         bool "Enable provisional physical input adapter"
         default n

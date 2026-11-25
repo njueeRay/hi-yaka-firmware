@@ -46,12 +46,16 @@ esp_err_t HiYaKaPca9557::WriteRegisterLocked(uint8_t reg, uint8_t value) {
         if (result == ESP_OK) {
             return ESP_OK;
         }
+        if (attempt == 1) {
+            first_write_failures_.fetch_add(1);
+        }
         if (attempt < kRegisterWriteAttempts) {
             ESP_LOGW(kTag, "register 0x%02X write failed (%s), retry %d/%d", reg,
                      esp_err_to_name(result), attempt + 1, kRegisterWriteAttempts);
             vTaskDelay(pdMS_TO_TICKS(1));
         }
     }
+    exhausted_writes_.fetch_add(1);
     ESP_LOGE(kTag,
              "register 0x%02X write exhausted (%s): SDA(GPIO%d)=%d SCL(GPIO%d)=%d",
              reg, esp_err_to_name(result), static_cast<int>(YAKA_I2C_SDA_GPIO),

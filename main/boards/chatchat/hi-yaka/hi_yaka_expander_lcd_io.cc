@@ -3,6 +3,7 @@
 #include "config.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <mutex>
 #include <new>
@@ -10,10 +11,12 @@
 #include <driver/parlio_tx.h>
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
 #include <driver/gpio.h>
+#include <esp_rom_sys.h>
 #endif
 #include <esp_heap_caps.h>
 #include <esp_lcd_panel_commands.h>
 #include <esp_lcd_panel_io_interface.h>
+#include <esp_timer.h>
 
 namespace {
 
@@ -33,6 +36,12 @@ struct ExpanderLcdIo {
     esp_lcd_panel_io_callbacks_t callbacks{};
     void* callback_context = nullptr;
     bool flush_pending = false;
+    int64_t refresh_started_us = 0;
+    std::atomic<uint32_t> refresh_completed{0};
+    std::atomic<uint32_t> refresh_failed{0};
+    std::atomic<uint32_t> refresh_slow{0};
+    std::atomic<uint32_t> refresh_last_us{0};
+    std::atomic<uint32_t> refresh_max_us{0};
     std::mutex mutex;
 };
 
@@ -81,7 +90,13 @@ esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
     for (size_t index = 0; index < size; ++index) {
         for (int bit = 7; bit >= 0; --bit) {
             gpio_set_level(YAKA_LCD_MOSI_GPIO, (source[index] >> bit) & 1U);
+#if !CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+            esp_rom_delay_us(1);
+#endif
             gpio_set_level(YAKA_LCD_SCLK_GPIO, 1);
+#if !CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+            esp_rom_delay_us(1);
+#endif
             gpio_set_level(YAKA_LCD_SCLK_GPIO, 0);
         }
     }
@@ -142,6 +157,7 @@ esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
             // so a failed parameter transfer can release LVGL even though the
             // driver aborts before reaching TxColor.
             context->flush_pending = true;
+            context->refresh_started_us = esp_timer_get_time();
         }
 
         result = context->expander->SetLcdControl(true, false);
@@ -157,7 +173,9 @@ esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
         }
         result = FinishTransaction(context, result);
         if (result != ESP_OK && context->flush_pending) {
+            context->refresh_failed.fetch_add(1);
             context->flush_pending = false;
+            context->refresh_started_us = 0;
             release_failed_flush = true;
         }
     }
@@ -188,6 +206,18 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
             }
         }
         result = FinishTransaction(context, result);
+        if (context->refresh_started_us > 0) {
+            const uint32_t elapsed_us = static_cast<uint32_t>(
+                esp_timer_get_time() - context->refresh_started_us);
+            context->refresh_last_us.store(elapsed_us);
+            uint32_t previous = context->refresh_max_us.load();
+            while (elapsed_us > previous &&
+                   !context->refresh_max_us.compare_exchange_weak(previous, elapsed_us)) {}
+            if (elapsed_us > 50000) context->refresh_slow.fetch_add(1);
+            if (result == ESP_OK) context->refresh_completed.fetch_add(1);
+            else context->refresh_failed.fetch_add(1);
+            context->refresh_started_us = 0;
+        }
         context->flush_pending = false;
     }
 
@@ -236,6 +266,18 @@ esp_err_t DeleteIo(esp_lcd_panel_io_t* io) {
 }
 
 }  // namespace
+
+esp_err_t hi_yaka_lcd_refresh_stats(esp_lcd_panel_io_handle_t io,
+                                    HiYaKaLcdRefreshStats* out) {
+    if (io == nullptr || out == nullptr) return ESP_ERR_INVALID_ARG;
+    auto* context = ToContext(reinterpret_cast<esp_lcd_panel_io_t*>(io));
+    out->completed = context->refresh_completed.load();
+    out->failed = context->refresh_failed.load();
+    out->slow_over_50ms = context->refresh_slow.load();
+    out->last_us = context->refresh_last_us.load();
+    out->max_us = context->refresh_max_us.load();
+    return ESP_OK;
+}
 
 esp_err_t hi_yaka_new_expander_lcd_io(HiYaKaPca9557* expander,
                                       int clock_hz,

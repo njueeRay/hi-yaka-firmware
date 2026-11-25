@@ -8,6 +8,7 @@
 #include "hi_yaka_adc.h"
 #include "hi_yaka_audio_ab.h"
 #include "hi_yaka_expander_lcd_io.h"
+#include "hi_yaka_lcd_menu.h"
 #include "hi_yaka_feedback.h"
 #include "hi_yaka_input.h"
 #include "hi_yaka_pca9557.h"
@@ -349,7 +350,11 @@ private:
         }
 
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+#if CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: fast GPIO diagnostic");
+#else
         ESP_LOGI(TAG, "LCD transport: slow GPIO diagnostic");
+#endif
 #else
         ESP_LOGI(TAG, "LCD transport: PARLIO");
 #endif
@@ -469,6 +474,9 @@ private:
         display_ = std::make_unique<SpiLcdDisplay>(
             panel_io, panel, YAKA_LCD_VIEW_WIDTH, YAKA_LCD_VIEW_HEIGHT,
             YAKA_LCD_OFFSET_X, YAKA_LCD_OFFSET_Y, true, false, true);
+#if CONFIG_HI_YAKA_LCD_MENU_DIAGNOSTIC
+        hi_yaka_start_lcd_menu_diagnostic(panel_io, pca9557_.get());
+#endif
         backlight_ = std::make_unique<ExpanderBacklight>(*pca9557_);
         backlight_->RestoreBrightness();
         uint8_t output = 0;
