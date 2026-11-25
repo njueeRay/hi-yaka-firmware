@@ -200,6 +200,8 @@
 
 **重试时间语义（离线代码核查）：**主线和阶段 B2b 的 PCA 写重试均调用 `vTaskDelay(pdMS_TO_TICKS(1))`；本轮 ESP32-C6 构建为 `CONFIG_FREERTOS_HZ=100`，[ESP-IDF v6.1 的换算宏](https://github.com/espressif/esp-idf/blob/v6.1/components/freertos/FreeRTOS-Kernel/include/freertos/projdefs.h#L39-L44)按整数运算得到 `1×100÷1000=0 tick`。因此这里不保证真正退避 1 ms，至多让出调度；它可能影响连续重试形态，**不能解释重试之前的空闲首访失败，也不是已证根因**。尚未就此实施修复 A/B；用户醒来前不做实板操作，M2 仍开放。
 
+**硬件／软件 I²C 隔离诊断已准备（2026-11-25，L0，未烧录）：**独立工作树 `.tmp/hi-yaka-pca-sw-hw-20261125` 提交 `dcbe017a2c52f5ab45a3d7b7f4bfa3fd643b2c2c`；Raynode 的 `/data/projects/hi-yaka-pca-sw-hw-20261125/pca-soft-hw` 用 `espressif/idf:v6.1` 构建成功，应用 SHA-256 为 `50eb7a42aa52491217ad6d4b6ea01c64232d0b6b6ab91ade164397f29d1f57b4`。镜像默认 `CONFIG_HI_YAKA_PCA_STRAPS_FIXED=n`，启动只报告 `HOLD`，不触发 I²C。解锁后才按硬件→软件→软件→硬件顺序比较同一 `0x19` 地址、20 ms 空闲、PCA 安全值 `0x40/0x38` 的首次访问，并记录逐字节软件 ACK、QMI 正控和空地址负控；软件 SCL 实际频率尚未测量，若软件成功还需控速复验。Windows 现可枚举 CH340K COM5，但板卡身份及 PN532 悬空模式脚尚未重新确认，**不能据端口出现就烧录或归因**。此诊断不改变产品固件、既有实板结论或 M2 未验收状态。
+
 本轮原始串口日志仅存工作区 `.tmp/`：`hi-yaka-c0-old-lcd-exact-boot{1..3}-20261123.log`、`hi-yaka-c0-full-gpio-replay-boot{1,2}-20261123.log`、`hi-yaka-c0-parlio-samesource-replay-boot{1,2}-20261123.log`，以及上述 1 MHz 日志。所有次数均为该 c0 板的用户视觉观察，不能与 c4 的 PCA 计数或另一板历史画面混算。M2 仍为未验收。
 
 同一轮 ACT_B 人工按键未出现可确认的串口事件，也**不能直接归因 PCA9557 错误**：按键扫描走独立的 ADC/GPIO 路径。两次捕获到的 `ladder=0 mV decoded=-1 key_a=1 key_b=1` 是无效采样窗口；源码在 ADC `ReadMillivolts` 失败时保留默认 0 mV 并令解码值为 `-1`，故这**不是实测按键电压为 0 V**。按键是否未跨去抖、采样失败或事件日志丢失仍须分辨，不能据这两帧给按键或 PCA9557 下根因结论。证据：工作区 `.tmp/hi-yaka-c4-main-lab-runtime-actb-20261123.log` 与 `...-actb-retry-20261123.log`；代码 `main/boards/chatchat/hi-yaka/hi_yaka_input.cc`。

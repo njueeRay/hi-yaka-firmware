@@ -4,7 +4,9 @@
 > 飞书目录：[HiYaKa](https://scnlb1lk96sb.feishu.cn/drive/folder/Qz1ifJDCvlYKz1dCBO2cFl9Bn3c)
 > 原则：Git Markdown 保存可审计的工程事实源；飞书保存协作副本、跨文档索引和附件入口。
 
-> **2026-11-25 最新增补：**YAKA-0004 已加入同板 ES7210 软件 I²C 历史旁证，明确它降低“纯 IDF 硬件控制器问题”作为通用解释的优先级，但不证明与 PCA9557 同源；c0 的 COM5 当前未枚举，未做新烧录。飞书正文 revision 144 已回读两份原始数字采样的时序复算，Base YAKA-0004 最新进展与“处理中”状态回读至 revision 100；本地专项 SHA-256 见下方映射，M2 仍未验收。
+> **2026-11-25 最新同步：**YAKA-0004 本地专项新增“硬件／软件 I²C 隔离诊断已准备”L0 记录，本地 SHA-256 `B1B16414034B5529888B38164336E365573D966D2E2628757C9ECC957E8D564E`；飞书原生正文 [YAKA-0004](https://scnlb1lk96sb.feishu.cn/docx/SLgSdvt0PoIvcqxJ2uAcCjNQnDe) revision 145 已回读同段。隔离提交 `dcbe017` 的 IDF 6.1 镜像已构建、默认 HOLD、未烧录；COM5 当前枚举但板卡与 PN532 模式脚未复核。Base 维持此前 revision 100 的“处理中”，M2 未验收；本次未上传新附件，也未改动公开仓库。
+
+> **2026-11-25 此前增补：**YAKA-0004 已加入同板 ES7210 软件 I²C 历史旁证，明确它降低“纯 IDF 硬件控制器问题”作为通用解释的优先级，但不证明与 PCA9557 同源；c0 的 COM5 当时未枚举，未做新烧录。飞书正文 revision 144 已回读两份原始数字采样的时序复算，Base YAKA-0004 最新进展与“处理中”状态回读至 revision 100；本地专项 SHA-256 见下方映射，M2 仍未验收。
 
 > **GitHub 可见性勘误与撤回（2026-11-25）：**个人 `njueeRay/hi-yaka-firmware` 实际为 PUBLIC。内部 YAKA-0004 增补及服务器运维记录曾误经 [PR #18](https://github.com/njueeRay/hi-yaka-firmware/pull/18) 合入公开 feature 分支，已由 [PR #19](https://github.com/njueeRay/hi-yaka-firmware/pull/19) 撤回；当前 feature 分支文件树与 PR #18 前一致。公开提交及 PR 历史仍可访问，不能声称已彻底移除。飞书 revision 140 与本地专项继续维护，暂不再次推往 PUBLIC 仓库；仓库可见性待 Owner 确认。
 
