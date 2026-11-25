@@ -12,6 +12,10 @@
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
 #include <driver/gpio.h>
 #include <esp_rom_sys.h>
+#if CONFIG_HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
+#include <soc/gpio_reg.h>
+#include <soc/soc.h>
+#endif
 #endif
 #include <esp_heap_caps.h>
 #include <esp_lcd_panel_commands.h>
@@ -90,6 +94,28 @@ esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
 
     const auto* source = static_cast<const uint8_t*>(data);
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+#if CONFIG_HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
+    static_assert(YAKA_LCD_MOSI_GPIO == GPIO_NUM_6 &&
+                  YAKA_LCD_SCLK_GPIO == GPIO_NUM_7,
+                  "Register-fast LCD output is only audited for C6 GPIO6/7");
+    static_assert(YAKA_LCD_MOSI_GPIO < 32 && YAKA_LCD_SCLK_GPIO < 32,
+                  "W1TS/W1TC low-bank registers only address GPIO0-31");
+    constexpr uint32_t kDataMask = 1U << YAKA_LCD_MOSI_GPIO;
+    constexpr uint32_t kClockMask = 1U << YAKA_LCD_SCLK_GPIO;
+    // Match the proven Waveshare GPIO-fast edge order: clock low, data
+    // stable, clock high. W1TS/W1TC affect only the selected pins, never
+    // read-modify-write the other GPIO outputs.
+    for (size_t index = 0; index < size; ++index) {
+        for (int bit = 7; bit >= 0; --bit) {
+            REG_WRITE(GPIO_OUT_W1TC_REG, kClockMask);
+            REG_WRITE((source[index] >> bit) & 1U
+                          ? GPIO_OUT_W1TS_REG : GPIO_OUT_W1TC_REG,
+                      kDataMask);
+            REG_WRITE(GPIO_OUT_W1TS_REG, kClockMask);
+        }
+    }
+    REG_WRITE(GPIO_OUT_W1TC_REG, kClockMask | kDataMask);
+#else
     // ST7789V latches SDA on SCL's rising edge. Three separate gpio_set_level
     // calls per bit preserve data-before-clock ordering. Function-call and
     // loop overhead is expected to exceed the panel's 10 ns data setup,
@@ -108,6 +134,7 @@ esp_err_t Transmit(ExpanderLcdIo* context, const void* data, size_t size) {
         }
     }
     gpio_set_level(YAKA_LCD_MOSI_GPIO, 0);
+#endif
     return ESP_OK;
 #else
     if (context->tx_unit == nullptr || context->encoded_buffer == nullptr) {

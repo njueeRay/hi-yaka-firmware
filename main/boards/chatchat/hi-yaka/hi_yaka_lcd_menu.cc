@@ -37,7 +37,9 @@ struct MenuState {
 lv_image_dsc_t frame_images[GIF_FRAME_COUNT] = {};
 
 const char* TransportName() {
-#if CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+#if CONFIG_HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
+    return "GPIO REG FAST";
+#elif CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
     return "GPIO FAST";
 #elif CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
     return "GPIO SLOW";
@@ -188,6 +190,7 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 5);
 
     state.uptime = lv_label_create(root);
+    lv_label_set_text(state.uptime, "UPTIME --:--:--");
     lv_obj_align(state.uptime, LV_ALIGN_TOP_LEFT, 8, 27);
     state.animation = lv_image_create(root);
     lv_image_set_src(state.animation, &frame_images[0]);
@@ -196,10 +199,13 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
     lv_label_set_text(animation_caption, "ANIMATION 48x48");
     lv_obj_align(animation_caption, LV_ALIGN_TOP_LEFT, 68, 65);
     state.timing = lv_label_create(root);
+    lv_label_set_text(state.timing, "LCD -- / -- ms");
     lv_obj_align(state.timing, LV_ALIGN_TOP_LEFT, 8, 109);
     state.health = lv_label_create(root);
+    lv_label_set_text(state.health, "SLOW --  DRAW FAIL --");
     lv_obj_align(state.health, LV_ALIGN_TOP_LEFT, 8, 131);
     state.retries = lv_label_create(root);
+    lv_label_set_text(state.retries, "PCA FIRST --  EXH --");
     lv_obj_align(state.retries, LV_ALIGN_TOP_LEFT, 8, 153);
     state.mode = lv_label_create(root);
     char mode_line[32];

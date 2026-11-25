@@ -1185,6 +1185,17 @@ menu "HiYaKa pre-board laboratory features"
             Remove the two explicit 1 us bit delays. The original slow
             diagnostic remains unchanged unless this flag is set.
 
+    config HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
+        bool "Use GPIO atomic set/clear registers for LCD fast diagnosis"
+        depends on HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC && IDF_TARGET_ESP32C6
+        default n
+        help
+            Laboratory-only alternative to the gpio_set_level fast path.
+            On ESP32-C6, GPIO6 and GPIO7 are in the GPIO0-31 output bank;
+            write their individual W1TS/W1TC bits directly. This profile
+            retains the same ST7789 and PCA9557 command sequence and does
+            not claim a fixed serial clock frequency.
+
     config HI_YAKA_LCD_MENU_DIAGNOSTIC
         bool "Show LCD menu and refresh diagnostics"
         depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS

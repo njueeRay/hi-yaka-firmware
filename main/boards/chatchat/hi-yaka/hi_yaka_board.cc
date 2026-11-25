@@ -350,7 +350,9 @@ private:
         }
 
 #if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
-#if CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
+#if CONFIG_HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: register-fast GPIO diagnostic");
+#elif CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
         ESP_LOGI(TAG, "LCD transport: fast GPIO diagnostic");
 #else
         ESP_LOGI(TAG, "LCD transport: slow GPIO diagnostic");
@@ -484,8 +486,9 @@ private:
             constexpr int kProbeSize = 48;
             constexpr int kProbeX = 8;
             constexpr int kProbeY = 8;
-            constexpr std::array<uint16_t, 3> kProbeColors = {
-                0xF800, 0x07E0, 0x001F};
+            // One sample only: consecutive probes exhausted PCA9557 writes
+            // on c0 before the display object could be constructed.
+            constexpr std::array<uint16_t, 1> kProbeColors = {0xF800};
             for (size_t sample = 0; sample < kProbeColors.size(); ++sample) {
                 std::fill_n(test_pixels, kProbeSize * kProbeSize,
                             kProbeColors[sample]);
