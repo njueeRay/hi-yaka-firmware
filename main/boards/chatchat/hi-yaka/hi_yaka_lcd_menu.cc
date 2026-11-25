@@ -14,6 +14,7 @@ namespace {
 struct MenuState {
     esp_lcd_panel_io_handle_t io;
     HiYaKaPca9557* expander;
+    lv_obj_t* root;
     lv_obj_t* uptime;
     lv_obj_t* animation;
     lv_obj_t* timing;
@@ -22,6 +23,10 @@ struct MenuState {
     uint32_t frame = 0;
     uint32_t last_second = UINT32_MAX;
     uint32_t last_logged_failure_sequence = 0;
+    uint32_t completed_before_menu = 0;
+    int64_t menu_created_us = 0;
+    bool one_shot_done = false;
+    bool one_shot_wait_logged = false;
 };
 
 const char* FailureStageName(HiYaKaLcdFailureStage stage) {
@@ -58,6 +63,35 @@ void UpdateMenu(lv_timer_t* timer) {
 
     HiYaKaLcdRefreshStats stats{};
     if (hi_yaka_lcd_refresh_stats(state->io, &stats) == ESP_OK) {
+        constexpr int64_t kOneShotDelayUs = 3000000;
+        const int64_t age_us = esp_timer_get_time() - state->menu_created_us;
+        if (!state->one_shot_done && !state->one_shot_wait_logged &&
+            age_us >= kOneShotDelayUs &&
+            stats.completed <= state->completed_before_menu) {
+            state->one_shot_wait_logged = true;
+            ESP_LOGW("HiYaKaMenu",
+                     "ONE_SHOT_WAIT no successful menu flush after %lld us",
+                     static_cast<long long>(age_us));
+        }
+        if (!state->one_shot_done && age_us >= kOneShotDelayUs &&
+            stats.completed > state->completed_before_menu) {
+            // Queue exactly one full redraw after the menu's first flush.
+            // This does not retry on a failed LCD or PCA transaction.
+            state->one_shot_done = true;
+            const lv_area_t area{0, 0,
+                                 lv_obj_get_width(state->root) - 1,
+                                 lv_obj_get_height(state->root) - 1};
+            const lv_result_t queued =
+                lv_obj_invalidate_area(state->root, &area);
+            ESP_LOGW("HiYaKaMenu",
+                     "ONE_SHOT_FULL_REDRAW age_us=%lld queued=%d area=%ld..%ld,%ld..%ld before_completed=%lu before_failed=%lu last_failure_seq=%lu",
+                     static_cast<long long>(age_us), queued == LV_RESULT_OK,
+                     static_cast<long>(area.x1), static_cast<long>(area.x2),
+                     static_cast<long>(area.y1), static_cast<long>(area.y2),
+                     static_cast<unsigned long>(stats.completed),
+                     static_cast<unsigned long>(stats.failed),
+                     static_cast<unsigned long>(stats.last_failure.sequence));
+        }
         std::snprintf(line, sizeof(line), "LCD last %lu  max %lu ms",
                       static_cast<unsigned long>(stats.last_us / 1000),
                       static_cast<unsigned long>(stats.max_us / 1000));
@@ -98,12 +132,19 @@ void UpdateMenu(lv_timer_t* timer) {
 void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
                                        HiYaKaPca9557* expander) {
     if (io == nullptr || expander == nullptr || !lvgl_port_lock(1000)) return;
-    static MenuState state{io, expander, nullptr, nullptr, nullptr, nullptr, nullptr};
+    static MenuState state{io, expander, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr};
+    HiYaKaLcdRefreshStats initial_stats{};
+    if (hi_yaka_lcd_refresh_stats(io, &initial_stats) == ESP_OK) {
+        state.completed_before_menu = initial_stats.completed;
+    }
     lv_display_t* display = lv_display_get_default();
     const int width = lv_display_get_horizontal_resolution(display);
     const int height = lv_display_get_vertical_resolution(display);
     ESP_LOGI("HiYaKaMenu", "LVGL geometry=%dx%d; expected c0 landscape=320x200", width, height);
     lv_obj_t* root = lv_obj_create(lv_layer_top());
+    state.root = root;
+    state.menu_created_us = esp_timer_get_time();
     lv_obj_set_size(root, width, height);
     lv_obj_set_pos(root, 0, 0);
     lv_obj_set_style_bg_color(root, lv_color_hex(0x0B1220), 0);
