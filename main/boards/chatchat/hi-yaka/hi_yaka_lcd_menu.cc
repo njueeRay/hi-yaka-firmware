@@ -17,6 +17,7 @@ struct MenuState {
     lv_obj_t* uptime;
     lv_obj_t* animation;
     lv_obj_t* timing;
+    lv_obj_t* health;
     lv_obj_t* retries;
     uint32_t frame = 0;
     uint32_t last_second = UINT32_MAX;
@@ -45,15 +46,17 @@ void UpdateMenu(lv_timer_t* timer) {
 
     HiYaKaLcdRefreshStats stats{};
     if (hi_yaka_lcd_refresh_stats(state->io, &stats) == ESP_OK) {
-        std::snprintf(line, sizeof(line), "LCD %lu/%lu ms  slow:%lu",
+        std::snprintf(line, sizeof(line), "LCD last %lu  max %lu ms",
                       static_cast<unsigned long>(stats.last_us / 1000),
-                      static_cast<unsigned long>(stats.max_us / 1000),
-                      static_cast<unsigned long>(stats.slow_over_50ms));
+                      static_cast<unsigned long>(stats.max_us / 1000));
         lv_label_set_text(state->timing, line);
-        std::snprintf(line, sizeof(line), "PCA 1st/exh %lu/%lu  draw:%lu",
-                      static_cast<unsigned long>(state->expander->first_write_failures()),
-                      static_cast<unsigned long>(state->expander->exhausted_writes()),
+        std::snprintf(line, sizeof(line), "slow>50:%lu  draw fail:%lu",
+                      static_cast<unsigned long>(stats.slow_over_50ms),
                       static_cast<unsigned long>(stats.failed));
+        lv_label_set_text(state->health, line);
+        std::snprintf(line, sizeof(line), "PCA first:%lu  exhausted:%lu",
+                      static_cast<unsigned long>(state->expander->first_write_failures()),
+                      static_cast<unsigned long>(state->expander->exhausted_writes()));
         lv_label_set_text(state->retries, line);
         ESP_LOGI("HiYaKaMenu", "uptime=%lu refresh_last_us=%lu refresh_max_us=%lu slow50=%lu refresh_failed=%lu pca_first=%lu pca_exhausted=%lu",
                  static_cast<unsigned long>(seconds),
@@ -71,36 +74,54 @@ void UpdateMenu(lv_timer_t* timer) {
 void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
                                        HiYaKaPca9557* expander) {
     if (io == nullptr || expander == nullptr || !lvgl_port_lock(1000)) return;
-    static MenuState state{io, expander, nullptr, nullptr, nullptr, nullptr};
+    static MenuState state{io, expander, nullptr, nullptr, nullptr, nullptr, nullptr};
+    lv_display_t* display = lv_display_get_default();
+    const int width = lv_display_get_horizontal_resolution(display);
+    const int height = lv_display_get_vertical_resolution(display);
+    ESP_LOGI("HiYaKaMenu", "LVGL geometry=%dx%d; expected c0 landscape=320x200", width, height);
     lv_obj_t* root = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(root, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(root, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(root, width, height);
+    lv_obj_set_pos(root, 0, 0);
     lv_obj_set_style_bg_color(root, lv_color_hex(0x0B1220), 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(root, 0, 0);
     lv_obj_set_style_radius(root, 0, 0);
+    lv_obj_set_style_pad_all(root, 0, 0);
     lv_obj_set_scrollbar_mode(root, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* title = lv_label_create(root);
     lv_label_set_text(title, "HiYaKa  MENU  GPIO FAST");
     lv_obj_set_style_text_color(title, lv_color_white(), 0);
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 4, 4);
+    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 7);
 
     state.uptime = lv_label_create(root);
     lv_obj_set_style_text_color(state.uptime, lv_color_white(), 0);
-    lv_obj_align(state.uptime, LV_ALIGN_TOP_LEFT, 4, 34);
+    lv_obj_align(state.uptime, LV_ALIGN_TOP_LEFT, 8, 36);
     state.animation = lv_obj_create(root);
     lv_obj_set_size(state.animation, 48, 48);
     lv_obj_set_style_border_width(state.animation, 0, 0);
     lv_obj_set_style_radius(state.animation, 6, 0);
-    lv_obj_align(state.animation, LV_ALIGN_TOP_LEFT, 4, 70);
+    lv_obj_align(state.animation, LV_ALIGN_TOP_LEFT, 8, 72);
     state.timing = lv_label_create(root);
     lv_obj_set_style_text_color(state.timing, lv_color_white(), 0);
-    lv_obj_align(state.timing, LV_ALIGN_TOP_LEFT, 4, 133);
+    lv_obj_align(state.timing, LV_ALIGN_TOP_LEFT, 8, 124);
+    state.health = lv_label_create(root);
+    lv_obj_set_style_text_color(state.health, lv_color_white(), 0);
+    lv_obj_align(state.health, LV_ALIGN_TOP_LEFT, 8, 145);
     state.retries = lv_label_create(root);
     lv_obj_set_style_text_color(state.retries, lv_color_white(), 0);
-    lv_obj_align(state.retries, LV_ALIGN_TOP_LEFT, 4, 157);
-    lv_timer_create(UpdateMenu, 150, &state);
+    lv_obj_align(state.retries, LV_ALIGN_TOP_LEFT, 8, 166);
+    lv_obj_t* labels[] = {title, state.uptime, state.timing, state.health,
+                          state.retries};
+    for (lv_obj_t* label : labels) {
+        lv_obj_set_size(label, width - 16, 19);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+    }
+    // A 150 ms timer can nearly saturate the observed 143 ms GPIO flush.
+    // Keep the diagnostic interactive while allowing an idle gap for I2C.
+    lv_timer_create(UpdateMenu, 300, &state);
     lvgl_port_unlock();
 }
 #else
