@@ -13,6 +13,9 @@
 #if CONFIG_HI_YAKA_LCD_MENU_DIAGNOSTIC
 namespace {
 
+constexpr uint32_t kClockUpdatePeriodMs = 10;
+constexpr uint32_t kMenuUpdatePeriodMs = 150;
+
 struct MenuState {
     esp_lcd_panel_io_handle_t io;
     HiYaKaPca9557* expander;
@@ -71,13 +74,9 @@ const char* FailureStageName(HiYaKaLcdFailureStage stage) {
     }
 }
 
-void UpdateMenu(lv_timer_t* timer) {
+void UpdateClock(lv_timer_t* timer) {
     auto* state = static_cast<MenuState*>(lv_timer_get_user_data(timer));
     if (state == nullptr) return;
-
-    // Keep the 48x48 changing region identical in both transport profiles.
-    lv_image_set_src(state->animation,
-                     &frame_images[(state->frame++) % GIF_FRAME_COUNT]);
 
     const uint64_t uptime_ms =
         static_cast<uint64_t>(esp_timer_get_time() / 1000);
@@ -90,6 +89,22 @@ void UpdateMenu(lv_timer_t* timer) {
                   static_cast<unsigned long>(seconds % 60),
                   static_cast<unsigned long>(uptime_ms % 1000));
     lv_label_set_text(state->uptime, line);
+}
+
+void UpdateMenu(lv_timer_t* timer) {
+    auto* state = static_cast<MenuState*>(lv_timer_get_user_data(timer));
+    if (state == nullptr) return;
+
+    // Keep the 48x48 changing region identical in both transport profiles.
+    // The animation remains at 150 ms; only the uptime text runs at 10 ms.
+    // This avoids multiplying animation redraw and PCA9557 control traffic by
+    // fifteen merely to expose the milliseconds field.
+    lv_image_set_src(state->animation,
+                     &frame_images[(state->frame++) % GIF_FRAME_COUNT]);
+
+    const uint32_t seconds = static_cast<uint32_t>(
+        esp_timer_get_time() / 1000000);
+    char line[64];
 
     if (seconds == state->last_second) return;
     state->last_second = seconds;
@@ -224,7 +239,8 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
         lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
         lv_obj_set_style_text_color(label, lv_color_black(), 0);
     }
-    lv_timer_create(UpdateMenu, 150, &state);
+    lv_timer_create(UpdateClock, kClockUpdatePeriodMs, &state);
+    lv_timer_create(UpdateMenu, kMenuUpdatePeriodMs, &state);
     lvgl_port_unlock();
 }
 #else
