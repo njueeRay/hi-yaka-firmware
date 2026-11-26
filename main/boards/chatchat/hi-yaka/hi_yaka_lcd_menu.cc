@@ -79,16 +79,20 @@ void UpdateMenu(lv_timer_t* timer) {
     lv_image_set_src(state->animation,
                      &frame_images[(state->frame++) % GIF_FRAME_COUNT]);
 
-    const uint32_t seconds = static_cast<uint32_t>(esp_timer_get_time() / 1000000);
-    if (seconds == state->last_second) return;
-    state->last_second = seconds;
+    const uint64_t uptime_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const uint32_t seconds = static_cast<uint32_t>(uptime_ms / 1000);
 
     char line[64];
-    std::snprintf(line, sizeof(line), "UPTIME %02lu:%02lu:%02lu",
+    std::snprintf(line, sizeof(line), "UPTIME %02lu:%02lu:%02lu.%03lu",
                   static_cast<unsigned long>(seconds / 3600 % 100),
                   static_cast<unsigned long>(seconds / 60 % 60),
-                  static_cast<unsigned long>(seconds % 60));
+                  static_cast<unsigned long>(seconds % 60),
+                  static_cast<unsigned long>(uptime_ms % 1000));
     lv_label_set_text(state->uptime, line);
+
+    if (seconds == state->last_second) return;
+    state->last_second = seconds;
 
     HiYaKaLcdRefreshStats stats{};
     if (hi_yaka_lcd_refresh_stats(state->io, &stats) == ESP_OK) {
@@ -190,7 +194,7 @@ void hi_yaka_start_lcd_menu_diagnostic(esp_lcd_panel_io_handle_t io,
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 5);
 
     state.uptime = lv_label_create(root);
-    lv_label_set_text(state.uptime, "UPTIME --:--:--");
+    lv_label_set_text(state.uptime, "UPTIME --:--:--.---");
     lv_obj_align(state.uptime, LV_ALIGN_TOP_LEFT, 8, 27);
     state.animation = lv_image_create(root);
     lv_image_set_src(state.animation, &frame_images[0]);
