@@ -24,6 +24,6 @@
 
 随后在同一 GPIO Fast 菜单负载上测试“每次真实 PCA9557 寄存器写前先探测 PCA 地址”。无预探测基线在 uptime 44 秒累计 `pca_first=979`。10 ms 探测版同一时点为 `pca_preflight=997`、真实写 `pca_first=63`，下降约 93.6%，但没有归零；120 秒窗口末仍为 `pca_preflight=2827`、`pca_first=221`。1 ms 探测版则在 uptime 118 秒达到 `pca_preflight=7916`、`pca_first=7012`，并出现一次 `pca_exhausted`、一次 RASET `refresh_failed`，菜单局刷由基线约 30 ms 恶化到约 100 ms。
 
-因此地址预探测只证明“前置地址活动可暂时改善后续事务”，不构成产品修复。10 ms 版本仍漏出真实写首败；1 ms 版本受驱动／调度超时语义影响而明显恶化。继续枚举中间超时值缺乏根因判别力，诊断开关已从当前源码移除。原始日志保留在本地证据目录 `pca-preflight-20261127/`，实验后产品应用重新写回并通过摘要校验，60 秒启动窗口重新进入 GPIO Fast，末值 `pca_first=1354`、`pca_exhausted=0`、`refresh_failed=0`。
+因此地址预探测只证明“前置地址活动可暂时改善后续事务”，不构成产品修复。10 ms 版本仍漏出真实写首败。1 ms 版本已由 ESP-IDF 6.1 源码定性：本构建 `CONFIG_FREERTOS_HZ=100`，`pdMS_TO_TICKS(1)` 为 0；`i2c_master_probe()` 最终以零等待时间获取完成信号量并触发软件超时，所以它不是更短的有效总线事务，也不能提供新的板级电气证据。在当前 tick 配置下继续枚举 2／3／4 ms 只会重复零 tick 错误，诊断开关已从当前源码移除。原始日志保留在本地证据目录 `pca-preflight-20261127/`，实验后产品应用重新写回并通过摘要校验，60 秒启动窗口重新进入 GPIO Fast，末值 `pca_first=1354`、`pca_exhausted=0`、`refresh_failed=0`。
 
 本版诊断镜像 SHA-256 为 `BBD0457C2CD9C0843E6A649A86CFC930908FB5D7C917CD184202DBD55F75BBBF`。实验前读取的 c0 启动区 SHA-256 为 `220134295F26E0EB710E4F975A6648AC0BC3E94CCF874024712B329FEDFD5472`；实验结束后该启动区和 GPIO Fast 产品应用均已写回并通过 esptool 写后验证。恢复启动日志再次进入横屏 GPIO Fast 路径，五次整屏约 `803.6～803.7 ms`，55 秒窗口内 `pca_exhausted=0`、`refresh_failed=0`，但 `pca_first` 仍从启动继续增长，说明恢复产品与修复底层异常是两个不同结论。
