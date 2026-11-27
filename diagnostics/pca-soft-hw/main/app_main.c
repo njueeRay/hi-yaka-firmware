@@ -327,14 +327,19 @@ done:
 
 void app_main(void)
 {
-#if !CONFIG_HI_YAKA_PCA_STRAPS_FIXED
+#if !CONFIG_HI_YAKA_PCA_STRAPS_FIXED && !CONFIG_HI_YAKA_PCA_ALLOW_FLOATING_PN532_CONFOUNDER
     ESP_LOGW(TAG, "HOLD: PN532 mode straps require physical confirmation; no I2C trial");
     return;
 #endif
     uint8_t mac[6] = {0};
     if (esp_efuse_mac_get_default(mac) == ESP_OK) {
-        ESP_LOGI(TAG, "BOARD_MAC %02x:%02x:%02x:%02x:%02x:%02x PN532 straps=externally confirmed",
-                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+#if CONFIG_HI_YAKA_PCA_STRAPS_FIXED
+        const char *strap_state = "FIXED_CONFIRMED";
+#else
+        const char *strap_state = "FLOATING_CONFOUNDED";
+#endif
+        ESP_LOGI(TAG, "BOARD_MAC %02x:%02x:%02x:%02x:%02x:%02x PN532=%s",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], strap_state);
     }
     gpio_set_level(PA, 0);
     const gpio_config_t cfg = {

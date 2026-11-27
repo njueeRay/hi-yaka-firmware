@@ -9,4 +9,13 @@ config HI_YAKA_PCA_STRAPS_FIXED
         and recorded. The default image only logs HOLD and performs no bus
         transaction.
 
+config HI_YAKA_PCA_ALLOW_FLOATING_PN532_CONFOUNDER
+    bool "Allow the recorded c0 floating-PN532 state as a confounded A/B trial"
+    default n
+    help
+        This does not claim the PN532 straps are valid. It only permits the
+        hardware-versus-software I2C ABBA experiment on the already recorded
+        c0 sample whose R73/R74 are removed. Results must be labelled
+        PN532_FLOATING_CONFOUNDED and cannot close the shared-bus root cause.
+
 endmenu
