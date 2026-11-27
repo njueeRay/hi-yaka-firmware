@@ -310,11 +310,23 @@ esp_err_t TransmitCommandPath(ExpanderLcdIo* context, const void* data,
     // Keep ST7789 commands and parameters on the already proven GPIO path.
     // PARLIO diagnostics vary only the pixel payload, otherwise a rejected
     // command stream is indistinguishable from a bad pixel packing scheme.
-    esp_err_t result = ReleaseParlioToGpio(context);
-    if (result != ESP_OK) return result;
     return TransmitGpioBytes(static_cast<const uint8_t*>(data), size, false);
 #else
     return Transmit(context, data, size);
+#endif
+}
+
+esp_err_t PrepareCommandPath(ExpanderLcdIo* context) {
+#if !CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC && !CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+    // Switching GPIO-matrix ownership can create clock/idle transitions. The
+    // panel must be deselected before PARLIO is released and GPIO routing is
+    // restored; otherwise those transitions are consumed as command bits.
+    // The opposite GPIO-to-PARLIO handoff is guarded in TxColor below.
+    esp_err_t result = context->expander->SetLcdControl(false, true);
+    if (result != ESP_OK) return result;
+    return ReleaseParlioToGpio(context);
+#else
+    return ESP_OK;
 #endif
 }
 
@@ -402,7 +414,10 @@ esp_err_t TxParam(esp_lcd_panel_io_t* io, int lcd_cmd, const void* param,
             CaptureWindow(context, lcd_cmd, param, param_size);
         }
 
-        result = context->expander->SetLcdControl(true, false);
+        result = PrepareCommandPath(context);
+        if (result == ESP_OK) {
+            result = context->expander->SetLcdControl(true, false);
+        }
         if (result == ESP_OK && lcd_cmd >= 0) {
             const uint8_t command = static_cast<uint8_t>(lcd_cmd);
             result = TransmitCommandPath(context, &command, sizeof(command));
@@ -446,7 +461,10 @@ esp_err_t TxColor(esp_lcd_panel_io_t* io, int lcd_cmd, const void* color,
     esp_err_t result = ESP_OK;
     {
         std::lock_guard<std::mutex> lock(context->mutex);
-        result = context->expander->SetLcdControl(true, false);
+        result = PrepareCommandPath(context);
+        if (result == ESP_OK) {
+            result = context->expander->SetLcdControl(true, false);
+        }
         if (result == ESP_OK && lcd_cmd >= 0) {
             const uint8_t command = static_cast<uint8_t>(lcd_cmd);
             result = TransmitCommandPath(context, &command, sizeof(command));

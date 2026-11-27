@@ -165,6 +165,32 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         )
         self.assertIn("chunk_size * 32", lcd_io)
         self.assertIn("EncodeSerialBytes", lcd_io)
+        self.assertIn("esp_err_t PrepareCommandPath", lcd_io)
+        command_path = lcd_io[
+            lcd_io.index("esp_err_t TransmitCommandPath") : lcd_io.index(
+                "esp_err_t PrepareCommandPath"
+            )
+        ]
+        self.assertNotIn("ReleaseParlioToGpio(context)", command_path)
+        prepare_path = lcd_io[
+            lcd_io.index("esp_err_t PrepareCommandPath") : lcd_io.index(
+                "esp_err_t TransmitColorPath"
+            )
+        ]
+        self.assertLess(
+            prepare_path.index("SetLcdControl(false, true)"),
+            prepare_path.index("ReleaseParlioToGpio(context)"),
+        )
+        for function_name in ("esp_err_t TxParam", "esp_err_t TxColor"):
+            function_body = lcd_io[
+                lcd_io.index(function_name) : lcd_io.index(
+                    "return result;", lcd_io.index(function_name)
+                )
+            ]
+            self.assertLess(
+                function_body.index("PrepareCommandPath(context)"),
+                function_body.index("SetLcdControl(true, false)"),
+            )
         self.assertIn("return result;", lcd_io)
         self.assertIn("lcd_cmd == LCD_CMD_CASET", lcd_io)
         self.assertIn("release_failed_flush", lcd_io)
