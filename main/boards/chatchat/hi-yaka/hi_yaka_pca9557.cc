@@ -12,6 +12,9 @@ constexpr uint8_t kInputPortRegister = 0x00;
 constexpr uint8_t kOutputPortRegister = 0x01;
 constexpr uint8_t kConfigurationRegister = 0x03;
 constexpr int kRegisterWriteAttempts = 5;
+#if CONFIG_HI_YAKA_PCA_PREFLIGHT_DIAGNOSTIC
+constexpr int kPreflightTimeoutMs = 1;
+#endif
 
 }  // namespace
 
@@ -40,11 +43,12 @@ esp_err_t HiYaKaPca9557::WriteRegisterLocked(uint8_t reg, uint8_t value) {
 #if CONFIG_HI_YAKA_PCA_PREFLIGHT_DIAGNOSTIC
     // The c0 isolation experiment measured a short-lived valid window after
     // any address transaction: PCA9557 accesses were 64/64 successful after
-    // gaps up to 5 ms and 0/64 after 10 ms. Keep this probe separate from
-    // the real write so the experiment can test a bounded mitigation without
-    // hiding the preflight NACK from telemetry.
+    // gaps up to 5 ms and 0/64 after 10 ms. The first 10 ms preflight variant
+    // reduced but did not eliminate real-write first failures because a timed
+    // out probe could consume the measured valid window. Keep the probe timeout
+    // below that window and count its NACK separately from the real write.
     const esp_err_t preflight =
-        i2c_master_probe(bus_, YAKA_PCA9557_I2C_ADDRESS, 10);
+        i2c_master_probe(bus_, YAKA_PCA9557_I2C_ADDRESS, kPreflightTimeoutMs);
     if (preflight != ESP_OK) {
         preflight_failures_.fetch_add(1);
     }
