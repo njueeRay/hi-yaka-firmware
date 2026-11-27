@@ -23,21 +23,18 @@ public:
     uint8_t output_shadow() const { return output_shadow_; }
     uint32_t first_write_failures() const { return first_write_failures_.load(); }
     uint32_t exhausted_writes() const { return exhausted_writes_.load(); }
-    uint32_t preflight_failures() const { return preflight_failures_.load(); }
 
 private:
     esp_err_t WriteRegisterLocked(uint8_t reg, uint8_t value);
     esp_err_t ReadRegisterLocked(uint8_t reg, uint8_t* value);
     esp_err_t WriteOutputLocked(uint8_t output);
 
-    i2c_master_bus_handle_t bus_ = nullptr;
     i2c_master_dev_handle_t device_ = nullptr;
     mutable std::mutex mutex_;
     uint8_t output_shadow_ = 0;
     bool ready_ = false;
     std::atomic<uint32_t> first_write_failures_{0};
     std::atomic<uint32_t> exhausted_writes_{0};
-    std::atomic<uint32_t> preflight_failures_{0};
 };
 
 #endif  // HI_YAKA_PCA9557_H_

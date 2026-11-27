@@ -33,16 +33,6 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         self.assertIn("CONFIG_HI_YAKA_ENABLE_AUDIO=y", lab_options)
         self.assertIn("CONFIG_HI_YAKA_BRINGUP_DIAGNOSTICS=y", lab_options)
         self.assertNotIn("CONFIG_HI_YAKA_ENABLE_PRODUCT_RUNTIME=y", lab_options)
-        self.assertNotIn("CONFIG_HI_YAKA_PCA_PREFLIGHT_DIAGNOSTIC=y", lab_options)
-
-        preflight_build = builds[
-            "hi-yaka-lab-lcd-gpio-register-menu-pca-preflight"
-        ]
-        preflight_options = set(preflight_build["sdkconfig_append"])
-        self.assertIn(
-            "CONFIG_HI_YAKA_PCA_PREFLIGHT_DIAGNOSTIC=y", preflight_options
-        )
-        self.assertNotIn("CONFIG_HI_YAKA_ENABLE_STORAGE=y", preflight_options)
 
         parlio_options = set(builds["hi-yaka-lab-lcd-parlio"]["sdkconfig_append"])
         gpio_options = set(builds["hi-yaka-lab-lcd-gpio"]["sdkconfig_append"])

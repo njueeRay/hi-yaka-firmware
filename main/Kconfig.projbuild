@@ -1251,17 +1251,6 @@ menu "HiYaKa pre-board laboratory features"
             This may be combined with either GPIO fast or PARLIO for A/B tests.
             Not a product UI.
 
-    config HI_YAKA_PCA_PREFLIGHT_DIAGNOSTIC
-        bool "Probe PCA9557 immediately before each register write"
-        default n
-        depends on HI_YAKA_BRINGUP_DIAGNOSTICS
-        help
-            Diagnostic mitigation for the measured 5-10 ms idle-first I2C
-            window. Issue an address probe immediately before the real
-            register write and count probe failures separately. This option
-            deliberately adds bus traffic and must not be enabled in the
-            default product build or described as a physical root-cause fix.
-
     config HI_YAKA_ENABLE_INPUT
         bool "Enable provisional physical input adapter"
         default n
