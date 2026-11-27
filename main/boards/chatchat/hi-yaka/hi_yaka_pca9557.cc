@@ -4,7 +4,6 @@
 
 #include <driver/gpio.h>
 #include <esp_log.h>
-#include <esp_rom_sys.h>
 
 namespace {
 
@@ -12,8 +11,7 @@ constexpr char kTag[] = "HiYaKaPca9557";
 constexpr uint8_t kInputPortRegister = 0x00;
 constexpr uint8_t kOutputPortRegister = 0x01;
 constexpr uint8_t kConfigurationRegister = 0x03;
-constexpr int kRegisterWriteAttempts = 3;
-constexpr uint32_t kRegisterRetryDelayUs = 1000;
+constexpr int kRegisterWriteAttempts = 5;
 
 }  // namespace
 
@@ -49,17 +47,13 @@ esp_err_t HiYaKaPca9557::WriteRegisterLocked(uint8_t reg, uint8_t value) {
         if (attempt == 1) {
             first_write_failures_.fetch_add(1);
         }
-        if (attempt < kRegisterWriteAttempts) {
-            ESP_LOGW(kTag, "register 0x%02X write failed (%s), retry %d/%d", reg,
-                     esp_err_to_name(result), attempt + 1, kRegisterWriteAttempts);
-            // CONFIG_FREERTOS_HZ is 100 on HiYaKa, so
-            // vTaskDelay(pdMS_TO_TICKS(1)) truncates to zero ticks and does
-            // not provide the intended 1 ms backoff. Keep the experiment's
-            // retry interval independent of the RTOS tick rate. This delay
-            // only runs after an actual NACK; it is not a workaround for the
-            // separate idle-first-address failure being investigated.
-            esp_rom_delay_us(kRegisterRetryDelayUs);
-        }
+        // Keep the bounded retries contiguous.  On this board the PCA9557 can
+        // NACK the first address phase after an idle interval while accepting
+        // the immediately following transaction.  Logging here at 115200 baud
+        // inserts several milliseconds before the next attempt and can turn
+        // that attempt into another idle-first access.  Report only the final
+        // exhaustion below; the atomic first-failure counter preserves the
+        // diagnostic signal without perturbing the retry timing.
     }
     exhausted_writes_.fetch_add(1);
     ESP_LOGE(kTag,

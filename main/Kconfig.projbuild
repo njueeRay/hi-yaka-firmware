@@ -1196,6 +1196,51 @@ menu "HiYaKa pre-board laboratory features"
             retains the same ST7789 and PCA9557 command sequence and does
             not claim a fixed serial clock frequency.
 
+    config HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC
+        bool "Use SPI2 DMA output for LCD transport comparison"
+        depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS
+        default n
+        help
+            Laboratory-only 12 MHz SPI2 DMA transport. ESP32-C6 has one
+            user GP-SPI controller and the HiYaKa TF card normally owns it
+            on a different pin set, so this profile must keep TF storage
+            disabled. It measures the LCD path only and is not a product
+            configuration that supports LCD and TF concurrently.
+
+    config HI_YAKA_LCD_PARLIO_ENCODED_DIAGNOSTIC
+        bool "Use four-bit encoded PARLIO for manual-CS A/B diagnosis"
+        depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS
+        depends on !HI_YAKA_LCD_GPIO_DIAGNOSTIC && !HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC
+        default n
+        help
+            Laboratory-only alternative for HiYaKa, whose LCD CS is behind
+            PCA9557 and cannot be driven by PARLIO valid. Expand each serial
+            source byte into four four-bit bus bytes while only data line 0
+            is connected. This preserves eight LCD clocks per source byte and
+            provides an A/B against the one-bit direct PARLIO stream.
+
+    config HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC
+        bool "Use one-bit MSB-first PARLIO for protocol A/B diagnosis"
+        depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS
+        depends on !HI_YAKA_LCD_GPIO_DIAGNOSTIC && !HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC
+        depends on !HI_YAKA_LCD_PARLIO_ENCODED_DIAGNOSTIC
+        default n
+        help
+            Laboratory-only minimal mapping of the proven GPIO byte order.
+            With a one-bit PARLIO bus, emit each byte from bit 7 to bit 0,
+            matching the ST7789 stream that succeeds through GPIO.
+
+    config HI_YAKA_LCD_PARLIO_CS_GUARD_DIAGNOSTIC
+        bool "Deassert expander CS while PARLIO claims LCD pins"
+        depends on HI_YAKA_LCD_PARLIO_ENCODED_DIAGNOSTIC || HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC
+        default n
+        help
+            Laboratory-only single-variable A/B. Finish the GPIO RAMWR
+            command, deassert LCD CS, let PARLIO claim MOSI/SCLK, and only
+            then assert CS again for the pixel DMA. This mirrors the effective
+            valid-CS window proven on the reference board without pretending
+            that PCA9557-backed CS can be driven by PARLIO hardware.
+
     config HI_YAKA_LCD_MENU_DIAGNOSTIC
         bool "Show LCD menu and refresh diagnostics"
         depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS

@@ -52,6 +52,7 @@
 #define YAKA_LCD_MOSI_GPIO GPIO_NUM_6
 #define YAKA_LCD_SCLK_GPIO GPIO_NUM_7
 #define YAKA_LCD_PIXEL_CLOCK_HZ (10 * 1000 * 1000)
+#define YAKA_LCD_SPI_DMA_CLOCK_HZ (12 * 1000 * 1000)
 #define YAKA_LCD_WIDTH 200
 #define YAKA_LCD_HEIGHT 320
 // The glass is mounted with its 320-pixel side horizontal on HiYaKa.

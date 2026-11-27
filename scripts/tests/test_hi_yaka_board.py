@@ -133,12 +133,36 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         )
         self.assertIn("YAKA_ES8311_CODEC_ADDRESS, YAKA_ES7210_CODEC_ADDRESS", source)
 
-    def test_lcd_does_not_consume_the_only_user_spi_controller(self):
+    def test_lcd_spi2_use_is_confined_to_storage_disabled_diagnostic(self):
         lcd_io = (BOARD_DIR / "hi_yaka_expander_lcd_io.cc").read_text(encoding="utf-8")
+        config = json.loads((BOARD_DIR / "config.json").read_text(encoding="utf-8"))
+        builds = {build["name"]: build for build in config["builds"]}
+        spi_options = set(
+            builds["hi-yaka-lab-lcd-spi-dma-menu"]["sdkconfig_append"]
+        )
+
         self.assertIn("parlio_new_tx_unit", lcd_io)
-        self.assertNotIn("spi_bus_initialize", lcd_io)
-        self.assertNotIn("spi_bus_add_device", lcd_io)
-        self.assertIn("tx_config.data_width = 4", lcd_io)
+        self.assertIn("#if CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC", lcd_io)
+        self.assertIn("spi_bus_initialize", lcd_io)
+        self.assertIn("spi_bus_add_device", lcd_io)
+        self.assertIn(
+            '#error "HiYaKa SPI2 LCD diagnostic cannot coexist with TF/SDSPI on different pins"',
+            lcd_io,
+        )
+        self.assertIn("CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC=y", spi_options)
+        self.assertIn("CONFIG_HI_YAKA_ENABLE_STORAGE=n", spi_options)
+        self.assertFalse(
+            any(
+                "CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC=y"
+                in build["sdkconfig_append"]
+                for name, build in builds.items()
+                if name != "hi-yaka-lab-lcd-spi-dma-menu"
+            )
+        )
+        self.assertRegex(
+            lcd_io,
+            r"tx_config\.data_width\s*=\s*\n#if CONFIG_HI_YAKA_LCD_PARLIO_ENCODED_DIAGNOSTIC\s*\n\s*4;",
+        )
         self.assertIn("chunk_size * 32", lcd_io)
         self.assertIn("EncodeSerialBytes", lcd_io)
         self.assertIn("return result;", lcd_io)
@@ -154,9 +178,18 @@ class HiYaKaBoardContractTest(unittest.TestCase):
 
     def test_pca9557_retries_transient_control_write_failures(self):
         source = (BOARD_DIR / "hi_yaka_pca9557.cc").read_text(encoding="utf-8")
-        self.assertIn("kRegisterWriteAttempts = 3", source)
+        self.assertIn("kRegisterWriteAttempts = 5", source)
         self.assertIn("attempt <= kRegisterWriteAttempts", source)
         self.assertIn("i2c_master_transmit(device_, data, sizeof(data), 100)", source)
+        self.assertIn("first_write_failures_.fetch_add(1)", source)
+        self.assertIn("exhausted_writes_.fetch_add(1)", source)
+        retry_body = source[
+            source.index("for (int attempt = 1;") : source.index(
+                "exhausted_writes_.fetch_add(1)"
+            )
+        ]
+        self.assertNotIn("ESP_LOG", retry_body)
+        self.assertNotIn("vTaskDelay", retry_body)
         self.assertIn('"register 0x%02X write exhausted', source)
         self.assertIn("gpio_get_level(YAKA_I2C_SDA_GPIO)", source)
         self.assertIn("gpio_get_level(YAKA_I2C_SCL_GPIO)", source)

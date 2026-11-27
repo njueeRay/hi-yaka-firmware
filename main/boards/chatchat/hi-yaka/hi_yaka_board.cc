@@ -349,7 +349,17 @@ private:
             return;
         }
 
-#if CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+#if CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: SPI2 DMA 12 MHz diagnostic; TF disabled");
+#elif CONFIG_HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: one-bit MSB-first PARLIO 10 MHz with guarded CS");
+#elif CONFIG_HI_YAKA_LCD_PARLIO_ENCODED_DIAGNOSTIC
+#if CONFIG_HI_YAKA_LCD_PARLIO_CS_GUARD_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: four-bit encoded PARLIO 10 MHz with guarded CS");
+#else
+        ESP_LOGI(TAG, "LCD transport: four-bit encoded PARLIO 10 MHz diagnostic");
+#endif
+#elif CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
 #if CONFIG_HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
         ESP_LOGI(TAG, "LCD transport: register-fast GPIO diagnostic");
 #elif CONFIG_HI_YAKA_LCD_GPIO_FAST_DIAGNOSTIC
@@ -362,8 +372,13 @@ private:
 #endif
 
         esp_lcd_panel_io_handle_t panel_io = nullptr;
+#if CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC
+        constexpr int kLcdTransportClockHz = YAKA_LCD_SPI_DMA_CLOCK_HZ;
+#else
+        constexpr int kLcdTransportClockHz = YAKA_LCD_PIXEL_CLOCK_HZ;
+#endif
         esp_err_t result = hi_yaka_new_expander_lcd_io(
-            pca9557_.get(), YAKA_LCD_PIXEL_CLOCK_HZ, &panel_io);
+            pca9557_.get(), kLcdTransportClockHz, &panel_io);
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "LCD expander IO initialization failed: %s", esp_err_to_name(result));
             return;
@@ -388,27 +403,44 @@ private:
         panel_config.bits_per_pixel = 16;
         esp_lcd_panel_handle_t panel = nullptr;
         result = esp_lcd_new_panel_st7789(panel_io, &panel_config, &panel);
-        if (result == ESP_OK) {
+        // The PARLIO comparison must reach the pixel phase even when the
+        // independently tracked PCA9557 first-write defect aborts one ST7789
+        // command. Keep this bounded retry in the diagnostic path only: it is
+        // an experiment gate, not a PCA9557 fix or production policy.
+#if !CONFIG_HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC && !CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
+        constexpr int kPanelInitAttempts = 5;
+#else
+        constexpr int kPanelInitAttempts = 1;
+#endif
+        for (int attempt = 1; result == ESP_OK && attempt <= kPanelInitAttempts; ++attempt) {
             result = esp_lcd_panel_reset(panel);
-        }
-        if (result == ESP_OK) {
-            result = esp_lcd_panel_init(panel);
-        }
-        if (result == ESP_OK) {
-            result = esp_lcd_panel_swap_xy(panel, true);
-        }
-        if (result == ESP_OK) {
-            result = esp_lcd_panel_mirror(panel, true, false);
-        }
-        if (result == ESP_OK) {
-            result = esp_lcd_panel_set_gap(
-                panel, YAKA_LCD_VIEW_GAP_X, YAKA_LCD_VIEW_GAP_Y);
-        }
-        if (result == ESP_OK) {
-            // esp_lcd_panel_init() leaves ST7789 display output disabled.
-            // Enable it before the visual color probe; otherwise successful
-            // RAM writes cannot be interpreted as a visible-panel test.
-            result = esp_lcd_panel_disp_on_off(panel, true);
+            if (result == ESP_OK) {
+                result = esp_lcd_panel_init(panel);
+            }
+            if (result == ESP_OK) {
+                result = esp_lcd_panel_swap_xy(panel, true);
+            }
+            if (result == ESP_OK) {
+                result = esp_lcd_panel_mirror(panel, true, false);
+            }
+            if (result == ESP_OK) {
+                result = esp_lcd_panel_set_gap(
+                    panel, YAKA_LCD_VIEW_GAP_X, YAKA_LCD_VIEW_GAP_Y);
+            }
+            if (result == ESP_OK) {
+                // esp_lcd_panel_init() leaves ST7789 display output disabled.
+                // Enable it before the visual color probe; otherwise successful
+                // RAM writes cannot be interpreted as a visible-panel test.
+                result = esp_lcd_panel_disp_on_off(panel, true);
+            }
+            if (result == ESP_OK || attempt == kPanelInitAttempts) {
+                break;
+            }
+            ESP_LOGW(TAG,
+                     "ST7789 diagnostic init attempt %d/%d failed: %s; retrying",
+                     attempt, kPanelInitAttempts, esp_err_to_name(result));
+            result = ESP_OK;
+            vTaskDelay(pdMS_TO_TICKS(20));
         }
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "ST7789 initialization failed: %s", esp_err_to_name(result));
