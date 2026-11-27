@@ -359,6 +359,8 @@ private:
 #else
         ESP_LOGI(TAG, "LCD transport: four-bit encoded PARLIO 10 MHz diagnostic");
 #endif
+#elif CONFIG_HI_YAKA_LCD_PARLIO_CS_GUARD_DIAGNOSTIC
+        ESP_LOGI(TAG, "LCD transport: one-bit LSB-first PARLIO 10 MHz with guarded CS");
 #elif CONFIG_HI_YAKA_LCD_GPIO_DIAGNOSTIC
 #if CONFIG_HI_YAKA_LCD_GPIO_REGISTER_FAST_DIAGNOSTIC
         ESP_LOGI(TAG, "LCD transport: register-fast GPIO diagnostic");

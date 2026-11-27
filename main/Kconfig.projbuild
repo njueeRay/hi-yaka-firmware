@@ -1232,7 +1232,8 @@ menu "HiYaKa pre-board laboratory features"
 
     config HI_YAKA_LCD_PARLIO_CS_GUARD_DIAGNOSTIC
         bool "Deassert expander CS while PARLIO claims or releases LCD pins"
-        depends on HI_YAKA_LCD_PARLIO_ENCODED_DIAGNOSTIC || HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC
+        depends on HI_YAKA_ENABLE_DISPLAY && HI_YAKA_BRINGUP_DIAGNOSTICS
+        depends on !HI_YAKA_LCD_GPIO_DIAGNOSTIC && !HI_YAKA_LCD_SPI_DMA_DIAGNOSTIC
         default n
         help
             Laboratory-only single-variable A/B. Finish the GPIO RAMWR
@@ -1241,7 +1242,9 @@ menu "HiYaKa pre-board laboratory features"
             deassert CS again before releasing PARLIO and restoring GPIO
             routing. This mirrors the effective valid-CS window proven on the
             reference board without pretending that PCA9557-backed CS can be
-            driven by PARLIO hardware.
+            driven by PARLIO hardware. It can be combined with encoded,
+            one-bit MSB, or default one-bit LSB transfer so bit order and pin
+            ownership timing remain independent A/B variables.
 
     config HI_YAKA_LCD_MENU_DIAGNOSTIC
         bool "Show LCD menu and refresh diagnostics"

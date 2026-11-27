@@ -44,6 +44,21 @@ class HiYaKaBoardContractTest(unittest.TestCase):
         )
         self.assertFalse(parlio_options - gpio_options)
 
+        msb_guard_options = set(
+            builds["hi-yaka-lab-lcd-parlio-msb-cs-guard-menu"]["sdkconfig_append"]
+        )
+        lsb_guard_options = set(
+            builds["hi-yaka-lab-lcd-parlio-lsb-cs-guard-menu"]["sdkconfig_append"]
+        )
+        self.assertIn("CONFIG_HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC=y", msb_guard_options)
+        self.assertNotIn("CONFIG_HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC=y", lsb_guard_options)
+        self.assertIn("CONFIG_HI_YAKA_LCD_PARLIO_CS_GUARD_DIAGNOSTIC=y", lsb_guard_options)
+        self.assertEqual(
+            msb_guard_options - lsb_guard_options,
+            {"CONFIG_HI_YAKA_LCD_PARLIO_MSB_DIAGNOSTIC=y"},
+        )
+        self.assertFalse(lsb_guard_options - msb_guard_options)
+
         headless_build = builds["hi-yaka-lab-headless"]
         self.assertEqual(headless_build["name"], "hi-yaka-lab-headless")
         headless_options = set(headless_build["sdkconfig_append"])
