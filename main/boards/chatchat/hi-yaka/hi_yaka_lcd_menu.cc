@@ -162,12 +162,13 @@ void UpdateMenu(lv_timer_t* timer) {
                       static_cast<unsigned long>(state->expander->first_write_failures()),
                       static_cast<unsigned long>(state->expander->exhausted_writes()));
         lv_label_set_text(state->retries, line);
-        ESP_LOGI("HiYaKaMenu", "uptime=%lu refresh_last_us=%lu refresh_max_us=%lu slow50=%lu refresh_failed=%lu pca_first=%lu pca_exhausted=%lu",
+        ESP_LOGI("HiYaKaMenu", "uptime=%lu refresh_last_us=%lu refresh_max_us=%lu slow50=%lu refresh_failed=%lu pca_preflight=%lu pca_first=%lu pca_exhausted=%lu",
                  static_cast<unsigned long>(seconds),
                  static_cast<unsigned long>(stats.last_us),
                  static_cast<unsigned long>(stats.max_us),
                  static_cast<unsigned long>(stats.slow_over_50ms),
                  static_cast<unsigned long>(stats.failed),
+                 static_cast<unsigned long>(state->expander->preflight_failures()),
                  static_cast<unsigned long>(state->expander->first_write_failures()),
                  static_cast<unsigned long>(state->expander->exhausted_writes()));
         const auto& failure = stats.last_failure;

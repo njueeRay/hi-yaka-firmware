@@ -15,7 +15,7 @@ constexpr int kRegisterWriteAttempts = 5;
 
 }  // namespace
 
-HiYaKaPca9557::HiYaKaPca9557(i2c_master_bus_handle_t bus) {
+HiYaKaPca9557::HiYaKaPca9557(i2c_master_bus_handle_t bus) : bus_(bus) {
     i2c_device_config_t config = {};
     config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     config.device_address = YAKA_PCA9557_I2C_ADDRESS;
@@ -34,9 +34,21 @@ HiYaKaPca9557::~HiYaKaPca9557() {
 }
 
 esp_err_t HiYaKaPca9557::WriteRegisterLocked(uint8_t reg, uint8_t value) {
-    if (device_ == nullptr) {
+    if (bus_ == nullptr || device_ == nullptr) {
         return ESP_ERR_INVALID_STATE;
     }
+#if CONFIG_HI_YAKA_PCA_PREFLIGHT_DIAGNOSTIC
+    // The c0 isolation experiment measured a short-lived valid window after
+    // any address transaction: PCA9557 accesses were 64/64 successful after
+    // gaps up to 5 ms and 0/64 after 10 ms. Keep this probe separate from
+    // the real write so the experiment can test a bounded mitigation without
+    // hiding the preflight NACK from telemetry.
+    const esp_err_t preflight =
+        i2c_master_probe(bus_, YAKA_PCA9557_I2C_ADDRESS, 10);
+    if (preflight != ESP_OK) {
+        preflight_failures_.fetch_add(1);
+    }
+#endif
     const uint8_t data[] = {reg, value};
     esp_err_t result = ESP_FAIL;
     for (int attempt = 1; attempt <= kRegisterWriteAttempts; ++attempt) {
